@@ -1,11 +1,17 @@
 # tweaker.nvim
 
-> Get your colorscheme faded. Inspect, tweak, and live-preview Neovim highlight
-> groups from a floating window — then bake your edits into a real colorscheme.
+> Meet your new favorite color scheme editor. Tweak Neovim highlight groups from
+> a floating window and see them update live — then bake your edits into a real colorscheme.
 
 `tweaker.nvim` lets you see exactly which highlight groups paint the text under
 your cursor (and at what priority), edit their colors in place, watch the change
 render in real time, and persist those tweaks so they survive restarts.
+
+Don't stop what you're doing and stew in frustration whenever you come across a color
+that grates on your eyes! Just tweak it to your liking real quick and get back to 
+whatever you were doing. Your Tweaker color overrides will be ready and waiting for
+whenever you want to actually update your color scheme at
+`~/.local/share/nvim/tweaker/overrides.json`
 
 > [!NOTE]
 > **Status: early development.** Live editing of foreground/background colors
@@ -23,12 +29,9 @@ render in real time, and persist those tweaks so they survive restarts.
     "cosmicbuffalo/tweaker.nvim",
     -- Load at startup so persisted overrides are re-applied to your colorscheme.
     lazy = false,
-    config = function()
-        require("tweaker").setup({
-            auto_save = false, -- persist only on :TweakerSave (true = persist on every edit)
-            -- path = vim.fn.stdpath("data") .. "/tweaker/overrides.json",
-        })
-    end,
+    opts = {
+        auto_save = false,
+    },
 }
 ```
 
@@ -38,11 +41,45 @@ render in real time, and persist those tweaks so they survive restarts.
 {
     dir = vim.fn.expand("~/tweaker.nvim"),
     lazy = false,
-    config = function()
-        require("tweaker").setup()
-    end,
+    opts = {},
 }
 ```
+
+## Configuration
+
+`opts` is passed to `require("tweaker").setup()`. Defaults:
+
+```lua
+{
+    -- Persist overrides to disk on every committed edit. When false, edits stay
+    -- in the session until you run :TweakerSave (and :TweakerLoad discards them).
+    auto_save = false,
+
+    -- Where overrides are stored (JSON, keyed per colorscheme).
+    path = vim.fn.stdpath("data") .. "/tweaker/overrides.json",
+}
+```
+
+### Appearance
+
+The window's colors come from dedicated, overridable highlight groups (they are
+intentionally **not** linked to `Normal`). Set them yourself to restyle the
+window — for example:
+
+```lua
+vim.api.nvim_set_hl(0, "TweakerBorder", { fg = "#e6c200", bg = "#101010" })
+```
+
+| Group              | Default                    | Used for                              |
+| ------------------ | -------------------------- | ------------------------------------- |
+| `TweakerNormal`    | white on black             | window background                     |
+| `TweakerBorder`    | yellow on black            | border + title                        |
+| `TweakerConnector` | yellow on black            | the leader line to the cursor         |
+| `TweakerCursor`    | black on white             | the source cursor location marker     |
+| `TweakerHeader`    | links `Title`              | the column header row                 |
+| `TweakerSource`    | links `Comment`            | the SOURCE column                     |
+| `TweakerPriority`  | links `Number`             | the PRIORITY column                   |
+| `TweakerEmpty`     | links `Comment`            | the `-` placeholder for empty cells   |
 
 ## Commands
 
