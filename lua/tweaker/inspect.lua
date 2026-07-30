@@ -74,7 +74,17 @@ function M.collect(bufnr, row, col)
         return a.source < b.source
     end)
 
-    return items, info
+    -- Dedupe: the same highlight group can be reported by multiple sources; keep
+    -- only its highest-priority occurrence (items are already sorted desc).
+    local seen, unique = {}, {}
+    for _, it in ipairs(items) do
+        if not seen[it.group] then
+            seen[it.group] = true
+            unique[#unique + 1] = it
+        end
+    end
+
+    return unique, info
 end
 
 return M

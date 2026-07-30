@@ -148,12 +148,31 @@ local function draw_field(buf, row, start, val)
     end
 end
 
+--- Byte bounds of the fg/bg fields on a data line. Normally fixed (7/7); while a
+--- field is being edited it absorbs the length delta, so the chrome follows it
+--- without mutating the buffer mid-insert.
+---@return integer fg_end, integer bg_start, integer bg_end
+local function field_bounds(line, s, lnum)
+    local n = #line
+    if s and s.field and s.active_lnum == lnum and n ~= LINE_LEN then
+        if s.field == 1 then
+            local e = math.max(0, n - FIELD_W)
+            return e, e, n
+        end
+        return FIELD_W, FIELD_W, n
+    end
+    return FIELD_W, FIELD_W, LINE_LEN
+end
+
 --- (Re)draw one data line's chrome from the current buffer text + read-only desc.
---- Assumes the line is normalized to LINE_LEN so byte offsets are fixed. Clears
---- and rebuilds this line's extmarks so nothing drifts after edits.
+--- Uses dynamic field bounds so it stays correct even while a field is being
+--- edited (line temporarily != LINE_LEN). Clears and rebuilds this line's marks.
 local function render_line(buf, lnum, desc, w)
+    local s = sessions[buf]
     local row = lnum - 1
     vim.api.nvim_buf_clear_namespace(buf, ns, row, row + 1)
+    local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
+    local fg_end, bg_start, bg_end = field_bounds(line, s, lnum)
 
     -- SOURCE + GROUP prefix (before the fg field).
     pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, FG_S, {
@@ -166,21 +185,19 @@ local function render_line(buf, lnum, desc, w)
         virt_text_pos = "inline",
         right_gravity = false,
     })
+    draw_field(buf, row, FG_S, trim(line:sub(FG_S + 1, fg_end)))
     -- Gap between the fg and bg fields.
-    pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, BG_S, {
+    pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, bg_start, {
         virt_text = { { string.rep(" ", GAP) } },
         virt_text_pos = "inline",
         right_gravity = false,
     })
+    draw_field(buf, row, bg_start, trim(line:sub(bg_start + 1, bg_end)))
     -- PRIORITY suffix (read-only) after the bg field.
-    pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, LINE_LEN, {
+    pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, bg_end, {
         virt_text = { { string.rep(" ", GAP) }, { padr(desc.priority, w.pw), "TweakerPriority" } },
         virt_text_pos = "inline",
     })
-
-    local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
-    draw_field(buf, row, FG_S, trim(line:sub(FG_S + 1, BG_S)))
-    draw_field(buf, row, BG_S, trim(line:sub(BG_S + 1, LINE_LEN)))
 end
 
 --- Public: get a buffer's session (used by the editor module).
@@ -409,13 +426,6 @@ function M.open(title, items, opts)
     vim.bo[buf].filetype = "tweaker"
     vim.bo[buf].bufhidden = "wipe"
 
-    if layout.has_data then
-        render_header(buf, layout.widths)
-        for lnum, desc in pairs(layout.rows) do
-            render_line(buf, lnum, desc, layout.widths)
-        end
-    end
-
     sessions[buf] = {
         cells = layout.cells,
         rows = layout.rows,
@@ -426,6 +436,13 @@ function M.open(title, items, opts)
         editable = editable,
         src = opts.source,
     }
+
+    if layout.has_data then
+        render_header(buf, layout.widths)
+        for lnum, desc in pairs(layout.rows) do
+            render_line(buf, lnum, desc, layout.widths)
+        end
+    end
 
     local height = math.min(#layout.lines, vim.o.lines - 4)
     local width = math.min(layout.width + 1, vim.o.columns - 4)
@@ -497,7 +514,9 @@ function M.open(title, items, opts)
         end
     end
 
-    for _, key in ipairs({ "q", "<Esc>", "<C-c>" }) do
+    -- In an editable window, <Esc> must stay "leave insert mode", not close.
+    local close_keys = editable and { "q", "<C-c>" } or { "q", "<Esc>", "<C-c>" }
+    for _, key in ipairs(close_keys) do
         vim.keymap.set("n", key, close, { buffer = buf, nowait = true, silent = true })
     end
     vim.keymap.set("n", "<Tab>", function()

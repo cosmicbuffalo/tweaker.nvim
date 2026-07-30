@@ -4,9 +4,8 @@ local ui = require("tweaker.ui")
 local M = {}
 
 local W = ui.FIELD_W -- fixed field width
-local LINE_LEN = ui.LINE_LEN -- two fields, no separators
 
---- Split a (possibly mid-edit) data line into its two fields, then rebuild it at
+--- Split a (possibly mid-edit) data line into its two fields and rebuild it at
 --- fixed width. Exactly one field (the one being edited) absorbed the length
 --- delta; the other kept width W.
 ---@return string newline, string fg, string bg
@@ -51,11 +50,10 @@ local function apply(s, lnum, fg, bg)
     pcall(vim.api.nvim_set_hl, 0, desc.group, new)
 end
 
---- Handle any change on a data line: normalize it back to fixed width, re-render
---- its chrome, apply the color, and keep the cursor in its field. Runs for both
---- insert and normal-mode changes; terminates on the re-entrant event because a
---- normalized line rebuilds to itself (no further edit).
-local function handle(buf)
+--- Common context for a change on the current line, or nil if it should be
+--- ignored.
+---@return table? s, integer? win, integer? lnum, integer? field
+local function ctx(buf)
     local s = ui.get_session(buf)
     if not s or not s.editable then
         return
@@ -65,30 +63,49 @@ local function handle(buf)
         return
     end
     local pos = vim.api.nvim_win_get_cursor(win)
-    local lnum = pos[1]
-    if lnum < s.first or lnum > s.last then
+    if pos[1] < s.first or pos[1] > s.last then
         return
     end
+    return s, win, pos[1], s.field or (pos[2] < W and 1 or 2)
+end
 
-    local field = s.field or (pos[2] < W and 1 or 2)
+--- Insert-mode change: re-render chrome at dynamic offsets and apply live. Never
+--- mutates the buffer or moves the cursor (that would corrupt the insert).
+local function live(buf)
+    local s, _, lnum, field = ctx(buf)
+    if not s then
+        return
+    end
+    local line = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
+    local _, fg, bg = split(line, field)
+    ui.rerender(buf, lnum)
+    apply(s, lnum, fg, bg)
+end
+
+--- Normal-mode change / InsertLeave: normalize the line back to fixed width
+--- (only if it changed), keep the cursor inside its field, re-render, apply.
+local function settle(buf)
+    local s, win, lnum, field = ctx(buf)
+    if not s then
+        return
+    end
     local line = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
     local newline, fg, bg = split(line, field)
     if line ~= newline then
         vim.api.nvim_buf_set_lines(buf, lnum - 1, lnum, false, { newline })
+        local fstart = field == 1 and 0 or W
+        local val = field == 1 and fg or bg
+        local col = math.min(math.max(win and vim.api.nvim_win_get_cursor(win)[2] or fstart, fstart), fstart + #val)
+        pcall(vim.api.nvim_win_set_cursor, win, { lnum, math.min(col, fstart + W - 1) })
     end
     ui.rerender(buf, lnum)
     apply(s, lnum, fg, bg)
-
-    local fstart = field == 1 and 0 or W
-    local val = field == 1 and fg or bg
-    pcall(vim.api.nvim_win_set_cursor, win, { lnum, math.max(fstart, math.min(fstart + #val, fstart + W - 1)) })
 end
 
 --- Wire editing autocmds onto an editable tweaker buffer.
 function M.attach(buf)
     local grp = vim.api.nvim_create_augroup("TweakerEditor_" .. buf, { clear = true })
 
-    -- Track the field being edited so length deltas are attributed correctly.
     vim.api.nvim_create_autocmd("InsertEnter", {
         group = grp,
         buffer = buf,
@@ -106,7 +123,7 @@ function M.attach(buf)
         group = grp,
         buffer = buf,
         callback = function()
-            handle(buf)
+            settle(buf)
             local s = ui.get_session(buf)
             if s then
                 s.field = nil
@@ -114,11 +131,18 @@ function M.attach(buf)
             end
         end,
     })
-    vim.api.nvim_create_autocmd({ "TextChangedI", "TextChanged" }, {
+    vim.api.nvim_create_autocmd("TextChangedI", {
         group = grp,
         buffer = buf,
         callback = function()
-            handle(buf)
+            live(buf)
+        end,
+    })
+    vim.api.nvim_create_autocmd("TextChanged", {
+        group = grp,
+        buffer = buf,
+        callback = function()
+            settle(buf)
         end,
     })
 end
