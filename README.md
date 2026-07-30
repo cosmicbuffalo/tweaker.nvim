@@ -52,9 +52,11 @@ Table columns: `SOURCE · GROUP · FG · BG · PRIORITY`. **FG and BG are editab
 motions (or `<Tab>`/`<S-Tab>`); edit a cell with normal editing. Accepted values:
 a hex color `#rrggbb` or `NONE` (clears the attribute). Changes apply to the
 running session live via `nvim_set_hl` as you edit; an empty cell shows `-` until
-you type into it.
+you type into it. Color cells keep a fixed width while you edit, so the other
+columns stay aligned. With the cursor over a hex code, `<M-Up>` / `<M-Down>`
+increment / decrement the R/G/B component under the cursor (clamped `00`–`ff`).
 
-Inside the float: `q` / `<Esc>` to close.
+Inside the float: `q` / `<C-c>` to close (read-only inspect also closes on `<Esc>`).
 
 ## Roadmap
 

@@ -115,7 +115,12 @@ editing a colorscheme file and reloading to see the effect.
   stops rendering.
 - **No reflow on edit.** Every cell that *could* hold a color string is padded to
   at least the width of a color string (`#rrggbb`). Adding a color to a
-  previously-empty cell must never resize the floating window.
+  previously-empty cell must never resize the floating window. Editable cells also
+  hold their fixed width *while being edited* (overtype-style: typing consumes a
+  trailing pad, deleting restores one) so the other columns never shift mid-edit.
+- **Stepping colors.** With the cursor over a hex color, `<M-Up>` / `<M-Down>`
+  increment / decrement the individual R, G, or B component the cursor is on,
+  clamped to the `00`–`ff` range, for quick fine-tuning without retyping.
 
 ## Live preview
 

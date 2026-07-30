@@ -69,15 +69,35 @@ local function ctx(buf)
     return s, win, pos[1], s.field or (pos[2] < W and 1 or 2)
 end
 
---- Insert-mode change: re-render chrome at dynamic offsets and apply live. Never
---- mutates the buffer or moves the cursor (that would corrupt the insert).
+--- Insert-mode change: keep the edited field at fixed width by adjusting only
+--- the trailing padding at that field's end (so BG/PRIORITY never shift), then
+--- re-render and apply live. The trailing edit is away from the cursor, so the
+--- cursor and the insert are undisturbed.
 local function live(buf)
     local s, _, lnum, field = ctx(buf)
-    if not s then
+    if not s or s.adjusting then
         return
     end
-    local line = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
-    local _, fg, bg = split(line, field)
+    local row = lnum - 1
+    local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
+    local delta = #line - LINE_LEN
+    if delta ~= 0 then
+        local fend = (field == 1 and 0 or W) + W -- byte where this field should end
+        s.adjusting = true
+        if delta > 0 then
+            -- Inserted: drop `delta` chars at the field's end (padding/overflow).
+            local from = math.min(fend, #line)
+            local to = math.min(fend + delta, #line)
+            pcall(vim.api.nvim_buf_set_text, buf, row, from, row, to, {})
+        else
+            -- Deleted: add back `-delta` padding spaces at the field's end.
+            local at = math.min(math.max(0, fend + delta), #line)
+            pcall(vim.api.nvim_buf_set_text, buf, row, at, row, at, { string.rep(" ", -delta) })
+        end
+        s.adjusting = false
+    end
+    local cur = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
+    local _, fg, bg = split(cur, field)
     ui.rerender(buf, lnum)
     apply(s, lnum, fg, bg)
 end
@@ -102,9 +122,51 @@ local function settle(buf)
     apply(s, lnum, fg, bg)
 end
 
+--- Increment/decrement (by `delta`) the R/G/B component of the hex color the
+--- cursor is hovering over, clamped to 00..ff. No-op unless the field holds a
+--- valid #rrggbb. Normal-mode helper for <M-Up>/<M-Down>.
+local function bump(buf, delta)
+    local s, win, lnum, field = ctx(buf)
+    if not s then
+        return
+    end
+    local col = vim.api.nvim_win_get_cursor(win)[2]
+    local fstart = field == 1 and 0 or W
+    local line = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
+    local color = util.parse_color(line:sub(fstart + 1, fstart + W))
+    if not color or color == "NONE" then
+        return
+    end
+
+    -- "#rrggbb": component by cursor column within the field (# counts as R).
+    local rel = col - fstart
+    local comp = rel <= 2 and 1 or (rel <= 4 and 2 or 3)
+    local hex = color:sub(2)
+    local i = (comp - 1) * 2 + 1
+    local byte = tonumber(hex:sub(i, i + 1), 16)
+    byte = math.max(0, math.min(255, byte + delta))
+    local newhex = hex:sub(1, i - 1) .. string.format("%02x", byte) .. hex:sub(i + 2)
+
+    local newline = line:sub(1, fstart) .. ui.padr("#" .. newhex, W) .. line:sub(fstart + W + 1)
+    s.adjusting = true
+    vim.api.nvim_buf_set_lines(buf, lnum - 1, lnum, false, { newline })
+    s.adjusting = false
+    pcall(vim.api.nvim_win_set_cursor, win, { lnum, col })
+    ui.rerender(buf, lnum)
+    local _, fg, bg = split(newline, field)
+    apply(s, lnum, fg, bg)
+end
+
 --- Wire editing autocmds onto an editable tweaker buffer.
 function M.attach(buf)
     local grp = vim.api.nvim_create_augroup("TweakerEditor_" .. buf, { clear = true })
+
+    vim.keymap.set("n", "<M-Up>", function()
+        bump(buf, 1)
+    end, { buffer = buf, nowait = true, silent = true, desc = "Tweaker: increment RGB component under cursor" })
+    vim.keymap.set("n", "<M-Down>", function()
+        bump(buf, -1)
+    end, { buffer = buf, nowait = true, silent = true, desc = "Tweaker: decrement RGB component under cursor" })
 
     vim.api.nvim_create_autocmd("InsertEnter", {
         group = grp,
