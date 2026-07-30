@@ -42,7 +42,7 @@ function M.collect(bufnr, row, col)
             -- Some sources report priority as a string (e.g. treesitter
             -- `(#set! priority N)` directives), so coerce to a number.
             priority = tonumber(priority) or 0,
-            hl = util.resolve(group),
+            hl = util.own(group), -- own definition (may be a link)
         })
     end
 

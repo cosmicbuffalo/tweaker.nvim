@@ -80,15 +80,18 @@ local function build(items)
     local rows = {}
     local sw, gw, pw = #"SOURCE", #"GROUP", #"PRIORITY"
     for _, it in ipairs(items) do
+        local link = it.hl.link -- nil, or the group this one links to
         local r = {
             source = it.source or "",
             group = it.group or "",
+            link = link,
             priority = it.priority ~= nil and tostring(it.priority) or "",
-            fg = util.hex(it.hl.fg), -- nil when unset
-            bg = util.hex(it.hl.bg),
+            -- Linked groups have no own colors: show blank, editable cells.
+            fg = not link and util.hex(it.hl.fg) or nil,
+            bg = not link and util.hex(it.hl.bg) or nil,
         }
         sw = math.max(sw, #r.source)
-        gw = math.max(gw, #r.group)
+        gw = math.max(gw, vim.fn.strdisplaywidth(r.group .. (link and (" → " .. link) or "")))
         pw = math.max(pw, #r.priority)
         rows[#rows + 1] = r
     end
@@ -97,12 +100,12 @@ local function build(items)
     local total_w = sw + GAP + gw + GAP + FIELD_W + GAP + FIELD_W + GAP + pw
 
     local lines = { "" } -- header line (chrome only)
-    local descs = {} -- lnum -> { source, group, priority }
+    local descs = {} -- lnum -> { source, group, link, priority }
     local cells = {} -- lnum -> editable byte-ranges
     for i, r in ipairs(rows) do
         local lnum = i + 1
         lines[lnum] = padr(r.fg or "", FIELD_W) .. padr(r.bg or "", FIELD_W)
-        descs[lnum] = { source = r.source, group = r.group, priority = r.priority }
+        descs[lnum] = { source = r.source, group = r.group, link = r.link, priority = r.priority }
         cells[lnum] = CELLS
     end
 
@@ -177,14 +180,25 @@ local function render_line(buf, lnum, desc, w)
     local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
     local fg_end, bg_start, bg_end = field_bounds(line, s, lnum)
 
-    -- SOURCE + GROUP prefix (before the fg field).
+    -- SOURCE + GROUP prefix (before the fg field). Linked groups show "group → target".
+    local group_hl = desc.group ~= "" and desc.group or "TweakerSource"
+    local vt = {
+        { padr(desc.source, w.sw), "TweakerSource" },
+        { string.rep(" ", GAP) },
+        { desc.group, group_hl },
+    }
+    local used = vim.fn.strdisplaywidth(desc.group)
+    if desc.link and desc.link ~= "" then
+        local ann = " → " .. desc.link
+        vt[#vt + 1] = { ann, "TweakerSource" }
+        used = used + vim.fn.strdisplaywidth(ann)
+    end
+    if used < w.gw then
+        vt[#vt + 1] = { string.rep(" ", w.gw - used) }
+    end
+    vt[#vt + 1] = { string.rep(" ", GAP) }
     pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, FG_S, {
-        virt_text = {
-            { padr(desc.source, w.sw), "TweakerSource" },
-            { string.rep(" ", GAP) },
-            { padr(desc.group, w.gw), desc.group ~= "" and desc.group or "TweakerSource" },
-            { string.rep(" ", GAP) },
-        },
+        virt_text = vt,
         virt_text_pos = "inline",
         right_gravity = false,
     })

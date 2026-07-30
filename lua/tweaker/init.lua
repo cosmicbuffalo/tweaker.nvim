@@ -31,7 +31,7 @@ function M.edit(names)
         local util = require("tweaker.util")
         local items = {}
         for _, name in ipairs(names) do
-            items[#items + 1] = { source = "", group = name, priority = "", hl = util.resolve(name) }
+            items[#items + 1] = { source = "", group = name, priority = "", hl = util.own(name) }
         end
         ui.open("Tweaker · edit", items, { editable = true })
     else
@@ -68,6 +68,10 @@ function M.setup(opts)
     cmd("TweakerLoad", function()
         require("tweaker.overrides").load()
     end, { desc = "Discard unsaved tweaks and reload persisted overrides" })
+
+    cmd("TweakerOpenOverrides", function()
+        vim.cmd.edit(vim.fn.fnameescape(require("tweaker.overrides").path()))
+    end, { desc = "Open the tweaker overrides file in the current window" })
 end
 
 return M

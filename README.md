@@ -89,6 +89,7 @@ vim.api.nvim_set_hl(0, "TweakerBorder", { fg = "#e6c200", bg = "#101010" })
 | `:TweakerToggle`    | Toggle application of your overrides on/off (persisted + session).   |
 | `:TweakerSave`      | Persist the current overrides to disk.                               |
 | `:TweakerLoad`      | Discard unsaved tweaks and reload the persisted overrides from disk. |
+| `:TweakerOpenOverrides` | Open the overrides JSON file in the current window.             |
 
 Table columns: `SOURCE · GROUP · FG · BG · PRIORITY`. **FG and BG are editable**
 (PRIORITY is read-only for now). Navigate between the FG/BG cells with normal Vim
@@ -98,6 +99,10 @@ running session live via `nvim_set_hl` as you edit; an empty cell shows `-` unti
 you type into it. Color cells keep a fixed width while you edit, so the other
 columns stay aligned. With the cursor over a hex code, `<M-Up>` / `<M-Down>`
 increment / decrement the R/G/B component under the cursor (clamped `00`–`ff`).
+
+A group that only **links** to another is shown as `group → target` with blank
+FG/BG cells (its colors come from the target). Typing a color into one of those
+cells **unlinks** the group and gives it that color directly.
 
 Inside the float: `q` / `<C-c>` to close.
 

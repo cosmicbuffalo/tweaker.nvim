@@ -1,5 +1,3 @@
-local util = require("tweaker.util")
-
 --- Manages tweaker's highlight overrides: an in-memory table (per colorscheme),
 --- optional JSON persistence, live application, an on/off toggle, and save/load.
 local M = {}
@@ -37,13 +35,16 @@ local function data()
     return state.data
 end
 
---- Apply one override on top of the group's current (scheme) attributes, so
---- other attributes (bold, etc.) survive.
+--- Apply one override, breaking any link (an overridden group is concrete). We
+--- start from the group's OWN attributes: for a linked group that's empty, so the
+--- result is a clean unlink with just fg/bg; for a group with its own attrs those
+--- (bold, etc.) are preserved.
 local function apply_group(group, ov)
     if not group or group == "" then
         return
     end
-    local base = vim.deepcopy(util.resolve(group))
+    local raw = vim.api.nvim_get_hl(0, { name = group })
+    local base = (type(raw) == "table" and not raw.link) and vim.deepcopy(raw) or {}
     base.link = nil
     base.fg = ov.fg
     base.bg = ov.bg
@@ -122,6 +123,11 @@ end
 
 function M.is_enabled()
     return state.enabled
+end
+
+--- The override file path.
+function M.path()
+    return state.path
 end
 
 --- Configure and start: load persisted overrides, apply them, and re-apply on

@@ -25,28 +25,37 @@ local function split(line, field)
     return ui.padr(fg, W) .. ui.padr(bg, W), fg, bg
 end
 
---- Record the row's fg/bg as an override (which applies it live). Parses each
---- cell: "#rrggbb" -> that color, NONE/empty -> cleared, invalid/partial -> keep
---- the group's current value (no change yet).
+--- Record the row's fg/bg as an override (which applies it live, breaking any
+--- link). Each cell: "#rrggbb" -> that color; NONE -> cleared; blank/partial ->
+--- keep the group's own value. Only records when a cell holds a *deliberate*
+--- value (a color or NONE), so a linked group isn't unlinked just by opening it
+--- or typing a partial value.
 local function apply(s, lnum, fg_raw, bg_raw)
     local desc = s.rows and s.rows[lnum]
     if not desc or not desc.group or desc.group == "" then
         return
     end
-    local cur = util.resolve(desc.group)
-    local function val(raw, curval)
+    local own = util.own(desc.group)
+    local own_fg = not own.link and own.fg or nil
+    local own_bg = not own.link and own.bg or nil
+    local function cell(raw, ownv)
         if raw == "" then
-            return nil
+            return nil, false -- blank -> no color, not deliberate
         end
         local c = util.parse_color(raw)
         if c == "NONE" then
-            return nil
+            return nil, true -- deliberate clear
         elseif c then
-            return c
+            return c, true -- deliberate color
         end
-        return util.hex(curval) -- invalid / partial: keep current
+        return util.hex(ownv), false -- invalid/partial -> keep own value
     end
-    overrides.set(desc.group, val(fg_raw, cur.fg), val(bg_raw, cur.bg))
+    local fg, fg_set = cell(fg_raw, own_fg)
+    local bg, bg_set = cell(bg_raw, own_bg)
+    if not (fg_set or bg_set) then
+        return -- nothing deliberate; leave the group (and any link) untouched
+    end
+    overrides.set(desc.group, fg, bg)
 end
 
 --- Common context for a change on the current line, or nil if it should be

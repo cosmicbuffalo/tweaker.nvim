@@ -24,6 +24,21 @@ function M.resolve(name)
     return hl
 end
 
+--- Get a highlight group's OWN definition (does not follow links). If the group
+--- is a link, the result has `.link` = the target name (and no colors).
+---@param name string
+---@return table  the own definition ({ link = "..." } or { fg=, bg=, ... }); may be empty
+function M.own(name)
+    if not name or name == "" then
+        return {}
+    end
+    local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = name })
+    if not ok or type(hl) ~= "table" then
+        return {}
+    end
+    return hl
+end
+
 --- Parse a color cell's contents into a canonical value.
 --- Accepts "#rrggbb" (any case) or "NONE" (any case), ignoring surrounding
 --- whitespace. Returns "#rrggbb" (lowercased), "NONE", or nil if invalid/blank.
