@@ -81,6 +81,60 @@ function M.autosave()
     end
 end
 
+--- Encode one override object compactly on a single line, e.g.
+--- `{ "fg": "#rrggbb", "bg": "#rrggbb" }` (fg/bg first, then any other keys).
+local function encode_entry(t)
+    local keys = {}
+    for k in pairs(t) do
+        keys[#keys + 1] = k
+    end
+    local rank = { fg = 1, bg = 2 }
+    table.sort(keys, function(a, b)
+        local ra, rb = rank[a] or 3, rank[b] or 3
+        if ra ~= rb then
+            return ra < rb
+        end
+        return a < b
+    end)
+    local parts = {}
+    for _, k in ipairs(keys) do
+        parts[#parts + 1] = vim.json.encode(k) .. ": " .. vim.json.encode(t[k])
+    end
+    if #parts == 0 then
+        return "{}"
+    end
+    return "{ " .. table.concat(parts, ", ") .. " }"
+end
+
+--- Pretty-print the overrides table: schemes and groups expanded (sorted, one per
+--- line, 2-space indent); each group's colors compact on a single line.
+local function encode_pretty(all)
+    local schemes = {}
+    for s in pairs(all) do
+        schemes[#schemes + 1] = s
+    end
+    table.sort(schemes)
+    if #schemes == 0 then
+        return "{}\n"
+    end
+    local out = { "{" }
+    for si, scheme in ipairs(schemes) do
+        local groups = {}
+        for g in pairs(all[scheme]) do
+            groups[#groups + 1] = g
+        end
+        table.sort(groups)
+        out[#out + 1] = "  " .. vim.json.encode(scheme) .. ": {"
+        for gi, g in ipairs(groups) do
+            local sep = gi < #groups and "," or ""
+            out[#out + 1] = "    " .. vim.json.encode(g) .. ": " .. encode_entry(all[scheme][g]) .. sep
+        end
+        out[#out + 1] = "  }" .. (si < #schemes and "," or "")
+    end
+    out[#out + 1] = "}"
+    return table.concat(out, "\n") .. "\n"
+end
+
 --- Write all overrides to disk.
 function M.save()
     local dir = vim.fn.fnamemodify(state.path, ":h")
@@ -90,7 +144,7 @@ function M.save()
         vim.notify("tweaker: cannot write " .. state.path, vim.log.levels.ERROR)
         return
     end
-    f:write(vim.json.encode(data()))
+    f:write(encode_pretty(data()))
     f:close()
     vim.notify("tweaker: saved overrides", vim.log.levels.INFO)
 end
