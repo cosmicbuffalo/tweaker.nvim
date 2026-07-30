@@ -205,14 +205,17 @@ function M.get_session(buf)
     return sessions[buf]
 end
 
---- Public: re-render one data line's chrome (used by the editor after edits).
-function M.rerender(buf, lnum)
+--- Public: re-render all chrome from the current buffer text. Clears the whole
+--- namespace first so nothing lingers — a full-line edit can push line-end inline
+--- extmarks onto the next line, and a per-line clear would miss those.
+function M.rerender(buf)
     local s = sessions[buf]
-    if not s or not s.rows then
+    if not s or not s.rows or not s.has_data then
         return
     end
-    local desc = s.rows[lnum]
-    if desc then
+    vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+    render_header(buf, s.widths)
+    for lnum, desc in pairs(s.rows) do
         render_line(buf, lnum, desc, s.widths)
     end
 end
@@ -242,7 +245,7 @@ local function confine(buf)
     end
     local pos = vim.api.nvim_win_get_cursor(win)
 
-    if s.field then
+    if s.field and vim.api.nvim_get_mode().mode:sub(1, 1) == "i" then
         -- Insert mode: keep the cursor inside the field being edited.
         local fstart = (s.field == 1) and FG_S or BG_S
         local lnum = s.active_lnum or pos[1]

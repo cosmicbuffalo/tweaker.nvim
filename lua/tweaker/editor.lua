@@ -67,7 +67,11 @@ local function ctx(buf)
     if pos[1] < s.first or pos[1] > s.last then
         return
     end
-    return s, win, pos[1], s.field or (pos[2] < W and 1 or 2)
+    -- Trust s.field only while actually in insert; otherwise derive from cursor
+    -- (s.field may be stale if insert was left via <C-c>, which skips InsertLeave).
+    local insert = vim.api.nvim_get_mode().mode:sub(1, 1) == "i"
+    local field = (insert and s.field) or (pos[2] < W and 1 or 2)
+    return s, win, pos[1], field
 end
 
 --- Insert-mode change: keep the edited field at fixed width by adjusting only
@@ -99,7 +103,7 @@ local function live(buf)
     end
     local cur = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
     local _, fg, bg = split(cur, field)
-    ui.rerender(buf, lnum)
+    ui.rerender(buf)
     apply(s, lnum, fg, bg)
 end
 
@@ -125,7 +129,7 @@ local function settle(buf)
         local col = math.min(math.max(win and vim.api.nvim_win_get_cursor(win)[2] or fstart, fstart), fstart + #val)
         pcall(vim.api.nvim_win_set_cursor, win, { lnum, math.min(col, fstart + W - 1) })
     end
-    ui.rerender(buf, lnum)
+    ui.rerender(buf)
     apply(s, lnum, fg, bg)
 end
 
@@ -159,7 +163,7 @@ local function bump(buf, delta)
     vim.api.nvim_buf_set_lines(buf, lnum - 1, lnum, false, { newline })
     s.adjusting = false
     pcall(vim.api.nvim_win_set_cursor, win, { lnum, col })
-    ui.rerender(buf, lnum)
+    ui.rerender(buf)
     local _, fg, bg = split(newline, field)
     apply(s, lnum, fg, bg)
 end
