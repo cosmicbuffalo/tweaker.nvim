@@ -24,4 +24,23 @@ function M.resolve(name)
     return hl
 end
 
+--- Parse a color cell's contents into a canonical value.
+--- Accepts "#rrggbb" (any case) or "NONE" (any case), ignoring surrounding
+--- whitespace. Returns "#rrggbb" (lowercased), "NONE", or nil if invalid/blank.
+---@param s string
+---@return string|nil
+function M.parse_color(s)
+    if type(s) ~= "string" then
+        return nil
+    end
+    local t = s:gsub("^%s+", ""):gsub("%s+$", "")
+    if t:match("^#%x%x%x%x%x%x$") then
+        return t:lower()
+    end
+    if t:upper() == "NONE" then
+        return "NONE"
+    end
+    return nil
+end
+
 return M

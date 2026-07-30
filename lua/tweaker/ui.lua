@@ -2,24 +2,23 @@ local util = require("tweaker.util")
 
 local M = {}
 
-local ns = vim.api.nvim_create_namespace("tweaker.render") -- float decorations
 local ns_src = vim.api.nvim_create_namespace("tweaker.source") -- source-buffer cursor indicator
+local ns = vim.api.nvim_create_namespace("tweaker.render") -- float chrome (persistent extmarks)
 
--- Fixed width of a color cell: wide enough to hold "#rrggbb" so filling an empty
--- cell never resizes the float.
-local COLOR_W = 7
+-- Editable color fields are fixed-width (wide enough for "#rrggbb") so columns
+-- never reflow and byte offsets stay constant. Real text of a data row is
+-- exactly two fields: FG = [0, FIELD_W), BG = [FIELD_W, LINE_LEN). Everything
+-- else (source, group, priority, gaps, swatches, "-") is virtual "chrome",
+-- drawn by a decoration provider so it recomputes each redraw (never drifts).
+local FIELD_W = 7
 local GAP = 2
+local FG_S = 0
+local BG_S = FIELD_W
+local LINE_LEN = FIELD_W * 2
+local CELLS = { { FG_S, BG_S }, { BG_S, LINE_LEN } }
 
--- Leader-line geometry (all in screen cells relative to the cursor).
-local GAP_ROWS = 1 -- rows of vertical connector between the cursor and the window top
-local SIDE_OFF = 3 -- preferred gap: window corner this many cols right of the cursor
-local ROUNDED = { "╭", "─", "╮", "│", "╯", "─", "╰", "│" } -- tl,top,tr,r,br,bottom,bl,l
-local CONNECTOR = { v = "│", h = "─", corner = "╰" }
--- Junction glyphs (all drawn as a 1x1 overlay over the border cell).
-local JOIN_SIDE = "┤" -- into the left edge, below the top-left corner
-local JOIN_TOP = "┴" -- straight down into the middle of the top border
-local JOIN_TOP_L = "├" -- straight down onto the top-left corner
-local JOIN_TOP_R = "┤" -- straight down onto the top-right corner
+M.FIELD_W = FIELD_W
+M.LINE_LEN = LINE_LEN
 
 -- Per-buffer session state (cell ranges, data-line bounds, cleanup info).
 ---@type table<integer, table>
@@ -62,147 +61,161 @@ local function padr(s, w)
     return s .. string.rep(" ", math.max(0, w - #s))
 end
 
---- Build the buffer lines, extmarks, and cell ranges for the given items.
+local function trim(s)
+    return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+M.padr = padr
+M.trim = trim
+
+--- Build the buffer lines, per-row read-only data, and column widths. The real
+--- text carries only the editable fields (fg, bg); all other columns are chrome
+--- drawn by the decoration provider.
 ---@param items tweaker.Item[]
 ---@return table layout
 local function build(items)
     local rows = {}
-    local pw, sw, gw = #"PRIORITY", #"SOURCE", #"GROUP"
+    local sw, gw, pw = #"SOURCE", #"GROUP", #"PRIORITY"
     for _, it in ipairs(items) do
         local r = {
-            pri = tostring(it.priority),
-            source = it.source,
-            group = it.group,
+            source = it.source or "",
+            group = it.group or "",
+            priority = it.priority ~= nil and tostring(it.priority) or "",
             fg = util.hex(it.hl.fg), -- nil when unset
             bg = util.hex(it.hl.bg),
         }
-        pw = math.max(pw, #r.pri)
         sw = math.max(sw, #r.source)
         gw = math.max(gw, #r.group)
+        pw = math.max(pw, #r.priority)
         rows[#rows + 1] = r
     end
 
-    -- Byte offsets of each real (editable) cell within a data line. Editable
-    -- cells (fg, bg, priority) are contiguous real text, rendered after the
-    -- virtual source/group block.
-    local fg_start = 0
-    local bg_start = fg_start + COLOR_W
-    local pri_start = bg_start + COLOR_W
-    local total_w = sw + GAP + gw + GAP + COLOR_W + GAP + COLOR_W + GAP + pw
+    local widths = { sw = sw, gw = gw, pw = pw }
+    local total_w = sw + GAP + gw + GAP + FIELD_W + GAP + FIELD_W + GAP + pw
 
-    local lines = {}
-    local marks = {} -- { row, col, opts }
-    local cells = {} -- lnum(1-based) -> { {s,e}, ... }
-
-    -- Header line (all virtual; cursor never lands here).
-    lines[1] = ""
-    marks[#marks + 1] = {
-        row = 0,
-        col = 0,
-        opts = {
-            virt_text = {
-                { padr("SOURCE", sw), "TweakerHeader" },
-                { string.rep(" ", GAP) },
-                { padr("GROUP", gw), "TweakerHeader" },
-                { string.rep(" ", GAP) },
-                { padr("FG", COLOR_W), "TweakerHeader" },
-                { string.rep(" ", GAP) },
-                { padr("BG", COLOR_W), "TweakerHeader" },
-                { string.rep(" ", GAP) },
-                { padr("PRIORITY", pw), "TweakerHeader" },
-            },
-            virt_text_pos = "inline",
-        },
-    }
-
+    local lines = { "" } -- header line (chrome only)
+    local descs = {} -- lnum -> { source, group, priority }
+    local cells = {} -- lnum -> editable byte-ranges
     for i, r in ipairs(rows) do
-        local row0 = i -- 0-based buffer line (header is 0)
-        -- Real text: fg | bg | priority. FG/BG are padded to a fixed width so
-        -- columns align and filling an empty cell never resizes the float. The
-        -- priority is last, so it gets no trailing pad — the row ends at its
-        -- final value and the cursor can't move past it.
-        local real = padr(r.fg or "", COLOR_W) .. padr(r.bg or "", COLOR_W) .. r.pri
-        lines[#lines + 1] = real
-        cells[i + 1] = {
-            { fg_start, bg_start },
-            { bg_start, pri_start },
-            { pri_start, pri_start + #r.pri },
-        }
-
-        -- Virtual, non-editable SOURCE + GROUP block, rendered before the cells.
-        marks[#marks + 1] = {
-            row = row0,
-            col = fg_start,
-            opts = {
-                virt_text = {
-                    { padr(r.source, sw), "TweakerSource" },
-                    { string.rep(" ", GAP) },
-                    { padr(r.group, gw), r.group }, -- rendered in its own colors
-                    { string.rep(" ", GAP) },
-                },
-                virt_text_pos = "inline",
-                right_gravity = false,
-            },
-        }
-
-        -- FG cell: color the value, or show a virtual "-" placeholder.
-        if r.fg then
-            marks[#marks + 1] =
-                { row = row0, col = fg_start, opts = { end_col = fg_start + #r.fg, hl_group = swatch_hl(r.fg) } }
-        else
-            marks[#marks + 1] = {
-                row = row0,
-                col = fg_start,
-                opts = { virt_text = { { "-", "TweakerEmpty" } }, virt_text_pos = "overlay" },
-            }
-        end
-
-        -- Gap between FG and BG (virtual, so the cursor skips it).
-        marks[#marks + 1] = {
-            row = row0,
-            col = bg_start,
-            opts = { virt_text = { { string.rep(" ", GAP) } }, virt_text_pos = "inline", right_gravity = false },
-        }
-
-        -- BG cell: color the value, or show a virtual "-" placeholder.
-        if r.bg then
-            marks[#marks + 1] =
-                { row = row0, col = bg_start, opts = { end_col = bg_start + #r.bg, hl_group = swatch_hl(r.bg) } }
-        else
-            marks[#marks + 1] = {
-                row = row0,
-                col = bg_start,
-                opts = { virt_text = { { "-", "TweakerEmpty" } }, virt_text_pos = "overlay" },
-            }
-        end
-
-        -- Gap between BG and PRIORITY (virtual).
-        marks[#marks + 1] = {
-            row = row0,
-            col = pri_start,
-            opts = { virt_text = { { string.rep(" ", GAP) } }, virt_text_pos = "inline", right_gravity = false },
-        }
-
-        -- Priority text highlight.
-        marks[#marks + 1] =
-            { row = row0, col = pri_start, opts = { end_col = pri_start + #r.pri, hl_group = "TweakerPriority" } }
+        local lnum = i + 1
+        lines[lnum] = padr(r.fg or "", FIELD_W) .. padr(r.bg or "", FIELD_W)
+        descs[lnum] = { source = r.source, group = r.group, priority = r.priority }
+        cells[lnum] = CELLS
     end
 
     return {
         lines = lines,
-        marks = marks,
+        rows = descs,
+        widths = widths,
         cells = cells,
-        first = 2, -- first data line (1-based)
+        first = 2,
         last = #rows + 1,
         width = total_w,
         has_data = #rows > 0,
     }
 end
 
---- Clamp the cursor to editable cells / data lines.
+--- Draw the (all-virtual) header row.
+local function render_header(buf, w)
+    pcall(vim.api.nvim_buf_set_extmark, buf, ns, 0, 0, {
+        virt_text = {
+            { padr("SOURCE", w.sw), "TweakerHeader" },
+            { string.rep(" ", GAP) },
+            { padr("GROUP", w.gw), "TweakerHeader" },
+            { string.rep(" ", GAP) },
+            { padr("FG", FIELD_W), "TweakerHeader" },
+            { string.rep(" ", GAP) },
+            { padr("BG", FIELD_W), "TweakerHeader" },
+            { string.rep(" ", GAP) },
+            { padr("PRIORITY", w.pw), "TweakerHeader" },
+        },
+        virt_text_pos = "inline",
+    })
+end
+
+local function draw_field(buf, row, start, val)
+    if val == "" then
+        pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, start, {
+            virt_text = { { "-", "TweakerEmpty" } },
+            virt_text_pos = "overlay",
+        })
+    else
+        local color = util.parse_color(val)
+        local hl = color and color ~= "NONE" and swatch_hl(color)
+        if hl then
+            pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, start, { end_col = start + #val, hl_group = hl })
+        end
+    end
+end
+
+--- (Re)draw one data line's chrome from the current buffer text + read-only desc.
+--- Assumes the line is normalized to LINE_LEN so byte offsets are fixed. Clears
+--- and rebuilds this line's extmarks so nothing drifts after edits.
+local function render_line(buf, lnum, desc, w)
+    local row = lnum - 1
+    vim.api.nvim_buf_clear_namespace(buf, ns, row, row + 1)
+
+    -- SOURCE + GROUP prefix (before the fg field).
+    pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, FG_S, {
+        virt_text = {
+            { padr(desc.source, w.sw), "TweakerSource" },
+            { string.rep(" ", GAP) },
+            { padr(desc.group, w.gw), desc.group ~= "" and desc.group or "TweakerSource" },
+            { string.rep(" ", GAP) },
+        },
+        virt_text_pos = "inline",
+        right_gravity = false,
+    })
+    -- Gap between the fg and bg fields.
+    pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, BG_S, {
+        virt_text = { { string.rep(" ", GAP) } },
+        virt_text_pos = "inline",
+        right_gravity = false,
+    })
+    -- PRIORITY suffix (read-only) after the bg field.
+    pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, LINE_LEN, {
+        virt_text = { { string.rep(" ", GAP) }, { padr(desc.priority, w.pw), "TweakerPriority" } },
+        virt_text_pos = "inline",
+    })
+
+    local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
+    draw_field(buf, row, FG_S, trim(line:sub(FG_S + 1, BG_S)))
+    draw_field(buf, row, BG_S, trim(line:sub(BG_S + 1, LINE_LEN)))
+end
+
+--- Public: get a buffer's session (used by the editor module).
+function M.get_session(buf)
+    return sessions[buf]
+end
+
+--- Public: re-render one data line's chrome (used by the editor after edits).
+function M.rerender(buf, lnum)
+    local s = sessions[buf]
+    if not s or not s.rows then
+        return
+    end
+    local desc = s.rows[lnum]
+    if desc then
+        render_line(buf, lnum, desc, s.widths)
+    end
+end
+
+-- Leader-line geometry (all in screen cells relative to the cursor).
+local GAP_ROWS = 1 -- rows of vertical connector between the cursor and the window top
+local SIDE_OFF = 3 -- preferred gap: window corner this many cols right of the cursor
+local ROUNDED = { "╭", "─", "╮", "│", "╯", "─", "╰", "│" } -- tl,top,tr,r,br,bottom,bl,l
+local CONNECTOR = { v = "│", h = "─", corner = "╰" }
+-- Junction glyphs (all drawn as a 1x1 overlay over the border cell).
+local JOIN_SIDE = "┤" -- into the left edge, below the top-left corner
+local JOIN_TOP = "┴" -- straight down into the middle of the top border
+local JOIN_TOP_L = "├" -- straight down onto the top-left corner
+local JOIN_TOP_R = "┤" -- straight down onto the top-right corner
+
+--- Clamp the cursor to editable cells / data lines. Skipped while a field is
+--- being actively edited (the field width is transient then).
 local function confine(buf)
     local s = sessions[buf]
-    if not s or not s.has_data then
+    if not s or not s.has_data or s.normalizing or s.field then
         return
     end
     local win = vim.api.nvim_get_current_win()
@@ -314,7 +327,6 @@ local function compute_placement(src, width, height)
 end
 
 --- Highlight the originating cursor position and draw the leader line down to
---- Highlight the originating cursor position and draw the leader line down to
 --- the float. The connector stops one cell short of the window; the overlay join
 --- glyph completes the connection.
 local function draw_source(src, placement)
@@ -370,29 +382,50 @@ end
 --- Open a floating window rendering the given items as a table.
 ---@param title string
 ---@param items tweaker.Item[]
----@param opts { source?: { win:integer, buf:integer, row:integer, col:integer } }|nil
+---@param opts { source?: table, editable?: boolean }|nil
 ---@return integer? win, integer? buf
 function M.open(title, items, opts)
     opts = opts or {}
     ensure_hl()
+    local editable = opts.editable or false
 
     local buf = vim.api.nvim_create_buf(false, true)
     local layout
-
     if #items == 0 then
-        layout = { lines = { " No highlights under cursor." }, marks = {}, cells = {}, has_data = false, width = 28 }
+        layout = {
+            lines = { " No highlights under cursor." },
+            cells = {},
+            rows = {},
+            widths = {},
+            has_data = false,
+            width = 28,
+        }
     else
         layout = build(items)
     end
 
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, layout.lines)
-    for _, m in ipairs(layout.marks) do
-        pcall(vim.api.nvim_buf_set_extmark, buf, ns, m.row, m.col, m.opts)
-    end
-
-    vim.bo[buf].modifiable = false
+    vim.bo[buf].modifiable = editable
     vim.bo[buf].filetype = "tweaker"
     vim.bo[buf].bufhidden = "wipe"
+
+    if layout.has_data then
+        render_header(buf, layout.widths)
+        for lnum, desc in pairs(layout.rows) do
+            render_line(buf, lnum, desc, layout.widths)
+        end
+    end
+
+    sessions[buf] = {
+        cells = layout.cells,
+        rows = layout.rows,
+        widths = layout.widths,
+        first = layout.first or 1,
+        last = layout.last or 1,
+        has_data = layout.has_data,
+        editable = editable,
+        src = opts.source,
+    }
 
     local height = math.min(#layout.lines, vim.o.lines - 4)
     local width = math.min(layout.width + 1, vim.o.columns - 4)
@@ -444,14 +477,6 @@ function M.open(title, items, opts)
         vim.wo[overlay_win].winhighlight = "NormalFloat:TweakerBorder"
     end
 
-    sessions[buf] = {
-        cells = layout.cells,
-        first = layout.first or 1,
-        last = layout.last or 1,
-        has_data = layout.has_data,
-        src = opts.source,
-    }
-
     if layout.has_data then
         vim.api.nvim_win_set_cursor(win, { layout.first, 0 })
     end
@@ -489,6 +514,10 @@ function M.open(title, items, opts)
         end,
     })
     vim.api.nvim_create_autocmd("WinLeave", { buffer = buf, once = true, callback = close })
+
+    if editable then
+        require("tweaker.editor").attach(buf)
+    end
 
     return win, buf
 end
