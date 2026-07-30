@@ -1,5 +1,6 @@
 local util = require("tweaker.util")
 local ui = require("tweaker.ui")
+local overrides = require("tweaker.overrides")
 
 local M = {}
 
@@ -24,31 +25,28 @@ local function split(line, field)
     return ui.padr(fg, W) .. ui.padr(bg, W), fg, bg
 end
 
---- Apply the row's fg/bg to its highlight group. Reads the group's current attrs
---- and overrides only fg/bg so other attributes survive.
-local function apply(s, lnum, fg, bg)
+--- Record the row's fg/bg as an override (which applies it live). Parses each
+--- cell: "#rrggbb" -> that color, NONE/empty -> cleared, invalid/partial -> keep
+--- the group's current value (no change yet).
+local function apply(s, lnum, fg_raw, bg_raw)
     local desc = s.rows and s.rows[lnum]
     if not desc or not desc.group or desc.group == "" then
         return
     end
-    local new = vim.deepcopy(util.resolve(desc.group))
-    new.link = nil
-    local function set_attr(key, raw)
+    local cur = util.resolve(desc.group)
+    local function val(raw, curval)
         if raw == "" then
-            new[key] = nil -- cleared cell -> remove attribute
-            return
+            return nil
         end
         local c = util.parse_color(raw)
         if c == "NONE" then
-            new[key] = nil
+            return nil
         elseif c then
-            new[key] = c
+            return c
         end
-        -- invalid / partial input: leave the attribute unchanged
+        return util.hex(curval) -- invalid / partial: keep current
     end
-    set_attr("fg", fg)
-    set_attr("bg", bg)
-    pcall(vim.api.nvim_set_hl, 0, desc.group, new)
+    overrides.set(desc.group, val(fg_raw, cur.fg), val(bg_raw, cur.bg))
 end
 
 --- Common context for a change on the current line, or nil if it should be
@@ -131,6 +129,7 @@ local function settle(buf)
     end
     ui.rerender(buf)
     apply(s, lnum, fg, bg)
+    overrides.autosave()
 end
 
 --- Increment/decrement (by `delta`) the R/G/B component of the hex color the
@@ -166,6 +165,7 @@ local function bump(buf, delta)
     ui.rerender(buf)
     local _, fg, bg = split(newline, field)
     apply(s, lnum, fg, bg)
+    overrides.autosave()
     pcall(vim.fn.winrestview, view)
 end
 

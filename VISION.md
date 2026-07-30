@@ -36,15 +36,18 @@ editing a colorscheme file and reloading to see the effect.
 
 ## Commands
 
-1. **Inspect (read-only).** Opens a floating window near the cursor showing the
-   highlight groups affecting the text under the cursor, with their details. A
-   quick "what is this color?" peek.
-2. **Tweak (editable, live).** Opens a similar floating window that additionally
-   lets you edit values and see the changes reflected in the rendered
-   colorscheme in **real time**.
-   - By default it loads the highlight groups under the cursor.
+1. **Tweak (editable, live).** `:Tweaker` opens a floating window that shows the
+   highlight groups affecting the text under the cursor and lets you edit their
+   values, with changes reflected in the rendered colorscheme in **real time**.
+   - By default it loads the highlight groups under the cursor (this subsumes the
+     old read-only "inspect": just look, or edit).
    - It also accepts arguments: any number of highlight group names, to edit
      those specific groups instead of the ones under the cursor.
+2. **Toggle.** `:TweakerToggle` flips the application of all overrides off/on, so
+   you can instantly compare your tweaks against the untouched colorscheme
+   (meant to live on a keymap).
+3. **Save / Load.** `:TweakerSave` persists overrides to disk; `:TweakerLoad`
+   discards unsaved edits and restores the last saved state.
 
 ## The floating window UX
 
@@ -129,10 +132,15 @@ so the actual rendered colorscheme updates as you type.
 
 ## Persistence
 
-- All edits to the current colorscheme are stored in a persisted file so that,
-  if Neovim is restarted, the edits are re-applied on the next startup.
-- Overrides re-apply on colorscheme load so they survive both restarts and
-  colorscheme switches.
+- Overrides are stored **per colorscheme** in a persisted file, so edits re-apply
+  on the next startup and whenever that colorscheme is loaded — surviving both
+  restarts and colorscheme switches.
+- A **config option** controls *when* edits are persisted: automatically as they
+  are written, or only on an explicit `:TweakerSave`.
+- `:TweakerLoad` reloads the latest persisted overrides, discarding any unsaved
+  edits; `:TweakerToggle` turns the whole override layer off and on (including
+  the persisted overrides), so the untouched colorscheme is always one keypress
+  away.
 
 ## Export to a colorscheme
 

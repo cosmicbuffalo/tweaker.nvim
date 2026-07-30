@@ -8,9 +8,9 @@ your cursor (and at what priority), edit their colors in place, watch the change
 render in real time, and persist those tweaks so they survive restarts.
 
 > [!NOTE]
-> **Status: early development.** Inspecting (`:TweakerInspect`) and live editing
-> of foreground/background colors (`:Tweaker`) work today. Persistence across
-> restarts and colorscheme export are on the roadmap below.
+> **Status: early development.** Live editing of foreground/background colors
+> (`:Tweaker`) and persistence of overrides work today; colorscheme export is on
+> the roadmap below.
 
 ## Requirements
 
@@ -21,9 +21,13 @@ render in real time, and persist those tweaks so they survive restarts.
 ```lua
 {
     "cosmicbuffalo/tweaker.nvim",
-    cmd = { "TweakerInspect", "Tweaker" },
+    -- Load at startup so persisted overrides are re-applied to your colorscheme.
+    lazy = false,
     config = function()
-        require("tweaker").setup()
+        require("tweaker").setup({
+            auto_save = false, -- persist only on :TweakerSave (true = persist on every edit)
+            -- path = vim.fn.stdpath("data") .. "/tweaker/overrides.json",
+        })
     end,
 }
 ```
@@ -33,7 +37,7 @@ render in real time, and persist those tweaks so they survive restarts.
 ```lua
 {
     dir = vim.fn.expand("~/tweaker.nvim"),
-    cmd = { "TweakerInspect", "Tweaker" },
+    lazy = false,
     config = function()
         require("tweaker").setup()
     end,
@@ -44,8 +48,10 @@ render in real time, and persist those tweaks so they survive restarts.
 
 | Command             | Description                                                          |
 | ------------------- | ------------------------------------------------------------------- |
-| `:TweakerInspect`   | Open a read-only float near the cursor listing every highlight group under it, sorted by priority (highest — the one that actually wins — first). |
 | `:Tweaker [group…]` | Open an editable float. With no arguments, edit the groups under the cursor; with group names, edit those groups. |
+| `:TweakerToggle`    | Toggle application of your overrides on/off (persisted + session).   |
+| `:TweakerSave`      | Persist the current overrides to disk.                               |
+| `:TweakerLoad`      | Discard unsaved tweaks and reload the persisted overrides from disk. |
 
 Table columns: `SOURCE · GROUP · FG · BG · PRIORITY`. **FG and BG are editable**
 (PRIORITY is read-only for now). Navigate between the FG/BG cells with normal Vim
@@ -56,13 +62,25 @@ you type into it. Color cells keep a fixed width while you edit, so the other
 columns stay aligned. With the cursor over a hex code, `<M-Up>` / `<M-Down>`
 increment / decrement the R/G/B component under the cursor (clamped `00`–`ff`).
 
-Inside the float: `q` / `<C-c>` to close (read-only inspect also closes on `<Esc>`).
+Inside the float: `q` / `<C-c>` to close.
+
+## Persistence
+
+Overrides are stored per-colorscheme in a JSON file (default
+`stdpath("data")/tweaker/overrides.json`) and re-applied to the matching
+colorscheme on startup and whenever the colorscheme changes.
+
+- `auto_save = true` writes to disk on every committed edit.
+- `auto_save = false` (default) keeps edits in the session until `:TweakerSave`;
+  `:TweakerLoad` throws away unsaved edits and restores the last saved state.
+- `:TweakerToggle` flips all overrides off/on (handy on a keymap) so you can
+  compare against the untouched colorscheme.
 
 ## Roadmap
 
-- [x] `:TweakerInspect` — read-only inspection of groups under the cursor
 - [x] `:Tweaker [group…]` — editable table with live fg/bg preview
-- [ ] Persist overrides across restarts (reapply on `ColorScheme`/startup)
+- [x] Persist overrides across restarts (reapply on `ColorScheme`/startup)
+- [x] Toggle overrides on/off; save/load
 - [ ] Export overrides to a standalone colorscheme
 - [ ] Editable priority
 

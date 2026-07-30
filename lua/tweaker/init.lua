@@ -1,7 +1,11 @@
 local M = {}
 
 ---@class tweaker.Config
-local defaults = {}
+---@field auto_save boolean  persist overrides to disk on every committed edit
+---@field path string|nil    override file location
+local defaults = {
+    auto_save = false,
+}
 
 M.config = vim.deepcopy(defaults)
 
@@ -16,13 +20,6 @@ local function cursor_source()
     -- align the leader line even with tabs / horizontal scroll.
     local dcol = vim.fn.virtcol(".") - 1 - (vim.fn.winsaveview().leftcol or 0)
     return { win = win, buf = buf, row = row, col = col, dcol = dcol }
-end
-
---- Open the read-only inspect float for the highlights under the cursor.
-function M.inspect()
-    local src = cursor_source()
-    local items = require("tweaker.inspect").collect(src.buf, src.row, src.col)
-    require("tweaker.ui").open("Tweaker · under cursor", items, { source = src })
 end
 
 --- Open the editable float. With no group names, edit the groups under the
@@ -44,22 +41,33 @@ function M.edit(names)
     end
 end
 
---- Plugin entry point. Registers user commands.
+--- Plugin entry point. Registers user commands and starts the overrides store.
 ---@param opts tweaker.Config|nil
 function M.setup(opts)
     M.config = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
+    require("tweaker.overrides").setup(M.config)
 
-    vim.api.nvim_create_user_command("TweakerInspect", function()
-        M.inspect()
-    end, { desc = "Inspect highlight groups under the cursor" })
+    local cmd = vim.api.nvim_create_user_command
 
-    vim.api.nvim_create_user_command("Tweaker", function(o)
+    cmd("Tweaker", function(o)
         M.edit(o.fargs)
     end, {
         nargs = "*",
         complete = "highlight",
         desc = "Edit highlight groups (under cursor, or named) with live preview",
     })
+
+    cmd("TweakerToggle", function()
+        require("tweaker.overrides").toggle()
+    end, { desc = "Toggle application of tweaker overrides on/off" })
+
+    cmd("TweakerSave", function()
+        require("tweaker.overrides").save()
+    end, { desc = "Persist tweaker overrides to disk" })
+
+    cmd("TweakerLoad", function()
+        require("tweaker.overrides").load()
+    end, { desc = "Discard unsaved tweaks and reload persisted overrides" })
 end
 
 return M
