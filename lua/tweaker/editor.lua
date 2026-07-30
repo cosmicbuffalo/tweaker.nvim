@@ -159,13 +159,14 @@ local function bump(buf, delta)
     local newhex = hex:sub(1, i - 1) .. string.format("%02x", byte) .. hex:sub(i + 2)
 
     local newline = line:sub(1, fstart) .. ui.padr("#" .. newhex, W) .. line:sub(fstart + W + 1)
+    local view = vim.fn.winsaveview() -- preserve cursor + scroll (no window shift)
     s.adjusting = true
     vim.api.nvim_buf_set_lines(buf, lnum - 1, lnum, false, { newline })
     s.adjusting = false
-    pcall(vim.api.nvim_win_set_cursor, win, { lnum, col })
     ui.rerender(buf)
     local _, fg, bg = split(newline, field)
     apply(s, lnum, fg, bg)
+    pcall(vim.fn.winrestview, view)
 end
 
 --- Wire editing autocmds onto an editable tweaker buffer.

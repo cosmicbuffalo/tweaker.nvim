@@ -5,12 +5,15 @@ local M = {}
 local ns_src = vim.api.nvim_create_namespace("tweaker.source") -- source-buffer cursor indicator
 local ns = vim.api.nvim_create_namespace("tweaker.render") -- float chrome (persistent extmarks)
 
--- Editable color fields are fixed-width (wide enough for "#rrggbb") so columns
--- never reflow and byte offsets stay constant. Real text of a data row is
--- exactly two fields: FG = [0, FIELD_W), BG = [FIELD_W, LINE_LEN). Everything
--- else (source, group, priority, gaps, swatches, "-") is virtual "chrome",
--- drawn by a decoration provider so it recomputes each redraw (never drifts).
-local FIELD_W = 7
+-- Editable color fields are fixed-width so columns never reflow and byte offsets
+-- stay constant. The field is one cell wider than a color ("#rrggbb" = 7), so a
+-- complete color always has a trailing pad space *inside* the field — that gives
+-- the cursor a real place to rest right after the last hex digit (before the gap),
+-- and removes the fg/bg boundary ambiguity. Real text of a data row is two fields:
+-- FG = [0, FIELD_W), BG = [FIELD_W, LINE_LEN). Everything else (source, group,
+-- priority, gaps, swatches, "-") is virtual "chrome".
+local COLOR_W = 7 -- width of "#rrggbb"
+local FIELD_W = COLOR_W + 1 -- color + trailing pad
 local GAP = 2
 local FG_S = 0
 local BG_S = FIELD_W
