@@ -3,20 +3,16 @@
 > Meet your new favorite color scheme editor. Tweak Neovim highlight groups from
 > a floating window and see them update live — then bake your edits into a real colorscheme.
 
-`tweaker.nvim` lets you see exactly which highlight groups paint the text under
-your cursor (and at what priority), edit their colors in place, watch the change
-render in real time, and persist those tweaks so they survive restarts.
-
 Don't stop what you're doing and stew in frustration whenever you come across a color
 that grates on your eyes! Just tweak it to your liking real quick and get back to 
-whatever you were doing. Your Tweaker color overrides will be ready and waiting for
-whenever you want to actually update your color scheme at
-`~/.local/share/nvim/tweaker/overrides.json`
+whatever you were doing. 
+
+When you're happy with your color scheme and ready to bake it, run `:TweakerBake` to turn
+your Tweaker overrides into a new color scheme file!
 
 > [!NOTE]
-> **Status: early development.** Live editing of foreground/background colors
-> (`:Tweaker`) and persistence of overrides work today; colorscheme export is on
-> the roadmap below.
+> **Status: early development.** Live editing (`:Tweaker`), persistence, and
+> exporting to a standalone colorscheme (`:TweakerBake`) work today.
 
 ## Requirements
 
@@ -57,6 +53,10 @@ whenever you want to actually update your color scheme at
 
     -- Where overrides are stored (JSON, keyed per colorscheme).
     path = vim.fn.stdpath("data") .. "/tweaker/overrides.json",
+
+    -- Extra/override master colors ({ name = "#hex" }) used to name palette
+    -- variables in :TweakerBake. Merged over the built-in list.
+    colors = {},
 }
 ```
 
@@ -90,6 +90,7 @@ vim.api.nvim_set_hl(0, "TweakerBorder", { fg = "#e6c200", bg = "#101010" })
 | `:TweakerSave`      | Persist the current overrides to disk.                               |
 | `:TweakerLoad`      | Discard unsaved tweaks and reload the persisted overrides from disk. |
 | `:TweakerOpenOverrides` | Open the overrides JSON file in the current window.             |
+| `:TweakerBake[!] [name]` | Export the current highlights + your tweaks to a standalone colorscheme `colors/<name>.lua` (bang to overwrite). |
 
 Table columns: `SOURCE · GROUP · FG · BG · PRIORITY`. **FG and BG are editable**
 (PRIORITY is read-only for now). Navigate between the FG/BG cells with normal Vim
@@ -118,12 +119,42 @@ colorscheme on startup and whenever the colorscheme changes.
 - `:TweakerToggle` flips all overrides off/on (handy on a keymap) so you can
   compare against the untouched colorscheme.
 
+## Export
+
+`:TweakerBake[!] [name]` writes a **standalone** colorscheme to
+`stdpath("config")/colors/<name>.lua` (default name `<current>-tweaked`), snapshotting
+every highlight group in the current session — base colorscheme + your applied
+tweaks — so it loads with no dependency on tweaker or the base scheme.
+
+Every unique color is hoisted into a named **palette variable** referenced by the
+`set` calls, so no hex appears twice:
+
+```lua
+local p = {
+  black_1     = "#000000",
+  dark_blue_1 = "#1a3456",
+  blue_1      = "#0078d4",
+  light_blue_1 = "#00a2ff",
+  -- … sorted by hex …
+}
+local set = vim.api.nvim_set_hl
+set(0, "Normal",  { fg = p.light_blue_1, bg = p.black_1 })
+set(0, "Comment", { fg = p.gray_2, italic = true })
+```
+
+Variable names come from the nearest match against a master color list (perceptual
+OKLab: hue picks the family, lightness picks the `dark_`/`light_` variant), with
+shades numbered `red_1`, `red_2`, … The master list covers the common colors and is
+fully overridable via the `colors` option.
+
+It refuses to overwrite an existing file unless you use the bang (`:TweakerBake! name`).
+
 ## Roadmap
 
 - [x] `:Tweaker [group…]` — editable table with live fg/bg preview
 - [x] Persist overrides across restarts (reapply on `ColorScheme`/startup)
 - [x] Toggle overrides on/off; save/load
-- [ ] Export overrides to a standalone colorscheme
+- [x] Export overrides to a standalone colorscheme (named palette variables)
 - [ ] Editable priority
 
 ## How it works

@@ -3,8 +3,10 @@ local M = {}
 ---@class tweaker.Config
 ---@field auto_save boolean  persist overrides to disk on every committed edit
 ---@field path string|nil    override file location
+---@field colors table|nil   extra/override master colors ({ name = "#hex" }) for export naming
 local defaults = {
     auto_save = false,
+    colors = {},
 }
 
 M.config = vim.deepcopy(defaults)
@@ -46,6 +48,7 @@ end
 function M.setup(opts)
     M.config = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
     require("tweaker.overrides").setup(M.config)
+    require("tweaker.palette").setup(M.config.colors)
 
     local cmd = vim.api.nvim_create_user_command
 
@@ -72,6 +75,15 @@ function M.setup(opts)
     cmd("TweakerOpenOverrides", function()
         vim.cmd.edit(vim.fn.fnameescape(require("tweaker.overrides").path()))
     end, { desc = "Open the tweaker overrides file in the current window" })
+
+    cmd("TweakerBake", function(o)
+        require("tweaker.export").write(o.args ~= "" and o.args or nil, o.bang)
+    end, {
+        nargs = "?",
+        bang = true,
+        complete = "color",
+        desc = "Export current highlights + tweaks to a standalone colorscheme (bang to overwrite)",
+    })
 end
 
 return M

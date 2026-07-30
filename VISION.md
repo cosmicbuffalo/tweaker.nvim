@@ -11,12 +11,6 @@
 colors and priorities from a floating window — then bake your accumulated tweaks
 into a real, shareable colorscheme.
 
-## Why "tweaker"
-
-The name plays on being "high" (as in highlights) and on "tweaking" — both the
-drug-culture slang and the literal act of tweaking color values. You are, quite
-literally, a tweaker fine-tuning your highlights.
-
 ## Who it's for
 
 Someone who lives in their editor and wants to adjust their colorscheme *in
@@ -65,8 +59,8 @@ editing a colorscheme file and reloading to see the effect.
     ```
     this is an ex*mple line of text     (* = cursor)
                  │
-                 │  ╭──── Tweaker · under cursor ──╮
-                 ╰──┤  … table …                   │
+                 │  ╭──── Tweaker · under cursor ───╮
+                 ╰──┤  … table …                    │
                     ╰───────────────────────────────╯
     ```
   - **Window is clamped to the right edge** (cursor too far right): the cursor now
@@ -77,8 +71,8 @@ editing a colorscheme file and reloading to see the effect.
     ```
     … a very long line of text … here*
                                      │
-        ╭──── Tweaker … ────────────┴────╮
-        │  … table …                     │
+        ╭──── Tweaker … ─────────────┴────╮
+        │  … table …                      │
         ╰─────────────────────────────────╯
     ```
 - **Source indicator.** The original cursor location in the underlying buffer is
@@ -149,9 +143,20 @@ so the actual rendered colorscheme updates as you type.
 
 ## Export to a colorscheme
 
-The user can take all their accumulated highlight-group changes from the
-persisted file and use them to create or edit an actual colorscheme plugin —
-turning ad-hoc tweaks into a real, shareable artifact.
+`:TweakerBake` turns the current appearance (base colorscheme + applied tweaks)
+into a **standalone** `colors/<name>.lua` — a real, shareable colorscheme that
+needs neither tweaker nor the base scheme installed.
+
+- Every unique color is hoisted into a **named palette variable** referenced by
+  the highlight calls, so no hex literal appears more than once and the palette
+  reads like a real, hand-authored theme.
+- Variable names are **human-readable**, derived by matching each color to the
+  nearest entry in a master color list (perceptual: hue chooses the family, e.g.
+  red/blue/cyan/…; lightness chooses the `dark_`/`light_` variant). Multiple
+  shades of a family are numbered `red_1`, `red_2`, … The master list covers the
+  common colors (with dark/light variants, black, white) and is user-configurable.
+- The palette and the master list are both **sorted by hex** for stable, readable
+  output.
 
 ## Guiding principles
 
