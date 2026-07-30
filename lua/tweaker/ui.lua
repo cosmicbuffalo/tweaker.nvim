@@ -526,10 +526,28 @@ function M.open(title, items, opts)
         jump_cell(buf, -1)
     end, { buffer = buf, nowait = true, silent = true })
 
+    -- The table is fixed and fits the window: block scrolling entirely.
+    for _, k in ipairs({ "<C-e>", "<C-y>", "<C-d>", "<C-u>", "<C-f>", "<C-b>", "<ScrollWheelUp>", "<ScrollWheelDown>" }) do
+        vim.keymap.set({ "n", "i" }, k, "<Nop>", { buffer = buf, nowait = true, silent = true })
+    end
+
     vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
         buffer = buf,
         callback = function()
             confine(buf)
+        end,
+    })
+    -- Belt-and-suspenders: snap the view back if anything scrolls it.
+    vim.api.nvim_create_autocmd("WinScrolled", {
+        buffer = buf,
+        callback = function()
+            if vim.api.nvim_win_is_valid(win) and vim.api.nvim_get_current_win() == win then
+                local v = vim.fn.winsaveview()
+                if v.topline ~= 1 or v.leftcol ~= 0 then
+                    v.topline, v.leftcol = 1, 0
+                    pcall(vim.fn.winrestview, v)
+                end
+            end
         end,
     })
     vim.api.nvim_create_autocmd("WinLeave", { buffer = buf, once = true, callback = close })

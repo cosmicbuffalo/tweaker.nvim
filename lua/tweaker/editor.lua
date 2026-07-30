@@ -4,6 +4,7 @@ local ui = require("tweaker.ui")
 local M = {}
 
 local W = ui.FIELD_W -- fixed field width
+local LINE_LEN = ui.LINE_LEN -- two fields, no separators
 
 --- Split a (possibly mid-edit) data line into its two fields and rebuild it at
 --- fixed width. Exactly one field (the one being edited) absorbed the length
@@ -109,6 +110,12 @@ local function settle(buf)
     if not s then
         return
     end
+    -- Guard against stray rows (e.g. a multiline paste): keep the fixed count.
+    if vim.api.nvim_buf_line_count(buf) > s.last then
+        s.adjusting = true
+        pcall(vim.api.nvim_buf_set_lines, buf, s.last, -1, false, {})
+        s.adjusting = false
+    end
     local line = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
     local newline, fg, bg = split(line, field)
     if line ~= newline then
@@ -167,6 +174,13 @@ function M.attach(buf)
     vim.keymap.set("n", "<M-Down>", function()
         bump(buf, -1)
     end, { buffer = buf, nowait = true, silent = true, desc = "Tweaker: decrement RGB component under cursor" })
+
+    -- Never add rows: block the line-creating commands. <CR> in insert leaves
+    -- insert instead of splitting the line.
+    for _, k in ipairs({ "o", "O" }) do
+        vim.keymap.set("n", k, "<Nop>", { buffer = buf, nowait = true, silent = true })
+    end
+    vim.keymap.set("i", "<CR>", "<Esc>", { buffer = buf, nowait = true, silent = true })
 
     vim.api.nvim_create_autocmd("InsertEnter", {
         group = grp,
