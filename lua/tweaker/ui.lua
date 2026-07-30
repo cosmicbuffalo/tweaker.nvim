@@ -228,11 +228,12 @@ local JOIN_TOP = "┴" -- straight down into the middle of the top border
 local JOIN_TOP_L = "├" -- straight down onto the top-left corner
 local JOIN_TOP_R = "┤" -- straight down onto the top-right corner
 
---- Clamp the cursor to editable cells / data lines. Skipped while a field is
---- being actively edited (the field width is transient then).
+--- Clamp the cursor to editable cells. In normal mode it may sit on any cell;
+--- while a field is being edited it is confined to that one field, so it can rest
+--- right behind the last character but never cross into the gap/next column.
 local function confine(buf)
     local s = sessions[buf]
-    if not s or not s.has_data or s.normalizing or s.field then
+    if not s or not s.has_data or s.normalizing then
         return
     end
     local win = vim.api.nvim_get_current_win()
@@ -240,6 +241,18 @@ local function confine(buf)
         return
     end
     local pos = vim.api.nvim_win_get_cursor(win)
+
+    if s.field then
+        -- Insert mode: keep the cursor inside the field being edited.
+        local fstart = (s.field == 1) and FG_S or BG_S
+        local lnum = s.active_lnum or pos[1]
+        local col = math.max(fstart, math.min(pos[2], fstart + FIELD_W - 1))
+        if pos[1] ~= lnum or pos[2] ~= col then
+            vim.api.nvim_win_set_cursor(win, { lnum, col })
+        end
+        return
+    end
+
     local lnum = math.max(s.first, math.min(pos[1], s.last))
     local ranges = s.cells[lnum]
     if not ranges then
@@ -425,6 +438,9 @@ function M.open(title, items, opts)
     vim.bo[buf].modifiable = editable
     vim.bo[buf].filetype = "tweaker"
     vim.bo[buf].bufhidden = "wipe"
+    -- No autocompletion in the tweaker window (blink.cmp / nvim-cmp both honor
+    -- this buffer-local flag).
+    vim.b[buf].completion = false
 
     sessions[buf] = {
         cells = layout.cells,
