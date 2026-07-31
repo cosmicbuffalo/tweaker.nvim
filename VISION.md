@@ -155,8 +155,9 @@ needs neither tweaker nor the base scheme installed.
   red/blue/cyan/…; lightness chooses the `dark_`/`light_` variant). Multiple
   shades of a family are numbered `red_1`, `red_2`, … The master list covers the
   common colors (with dark/light variants, black, white) and is user-configurable.
-- The palette and the master list are both **sorted by hex** for stable, readable
-  output.
+- The palette is **grouped by color name** — all shades of a color sit together,
+  with its `dark_`/base/`light_` variants adjacent — for readable output; the
+  master list is kept sorted by hex.
 
 ## Guiding principles
 

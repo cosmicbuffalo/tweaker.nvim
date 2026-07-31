@@ -135,7 +135,7 @@ local p = {
   dark_blue_1 = "#1a3456",
   blue_1      = "#0078d4",
   light_blue_1 = "#00a2ff",
-  -- … sorted by hex …
+  -- … grouped by color name …
 }
 local set = vim.api.nvim_set_hl
 set(0, "Normal",  { fg = p.light_blue_1, bg = p.black_1 })

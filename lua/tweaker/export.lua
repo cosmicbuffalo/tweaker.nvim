@@ -24,6 +24,25 @@ local ATTRS = {
     "blend",
 }
 
+--- Sort key for grouping palette variables by color name: (core family,
+--- variant rank dark<base<light, hex-order index). Keeps all shades of a color
+--- together and its dark_/base/light_ variants adjacent.
+---@param v string  variable name like "dark_blue_2"
+---@return string core, integer variant, integer index
+local function name_key(v)
+    local base, idx = v:match("^(.-)_(%d+)$")
+    base = base or v
+    idx = tonumber(idx) or 0
+    local d = base:match("^dark_(.+)$")
+    local l = base:match("^light_(.+)$")
+    if d then
+        return d, 0, idx
+    elseif l then
+        return l, 2, idx
+    end
+    return base, 1, idx
+end
+
 --- hex -> variable name. Unique hexes are sorted by value, grouped by nearest
 --- master color, and numbered (_1, _2, ...) in that hex order.
 ---@return table map, string[] sorted_hexes
@@ -72,13 +91,27 @@ function M.generate(name)
     add(string.format("vim.o.background = %q", vim.o.background))
     add("")
 
-    -- Palette table, sorted by hex, aligned for readability.
+    -- Palette table, grouped by color name for readability: all shades of a
+    -- color sit together (its dark_/base/light_ variants kept adjacent), and
+    -- within a name the hex-order index (_1, _2, ...) is preserved.
     add("local p = {")
     local w = 0
     for _, hex in ipairs(sorted_hexes) do
         w = math.max(w, #var[hex])
     end
-    for _, hex in ipairs(sorted_hexes) do
+    local print_order = vim.deepcopy(sorted_hexes)
+    table.sort(print_order, function(a, b)
+        local ca, va, ia = name_key(var[a])
+        local cb, vb, ib = name_key(var[b])
+        if ca ~= cb then
+            return ca < cb
+        end
+        if va ~= vb then
+            return va < vb
+        end
+        return ia < ib
+    end)
+    for _, hex in ipairs(print_order) do
         add(string.format("  %-" .. w .. 's = "%s",', var[hex], hex))
     end
     add("}")
