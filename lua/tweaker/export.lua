@@ -43,19 +43,28 @@ local function name_key(v)
     return base, 1, idx
 end
 
---- hex -> variable name. Unique hexes are sorted by value, grouped by nearest
---- master color, and numbered (_1, _2, ...) in that hex order.
----@return table map, string[] sorted_hexes
+--- hex -> variable name. Hexes are grouped by nearest master color, and the
+--- shades within each name are numbered (_1, _2, ...) by perceptual lightness
+--- (dark -> light) so they read as a clean gradient.
+---@return table map, string[] hexes
 local function build_vars(used)
     local hexes = vim.tbl_keys(used)
-    table.sort(hexes, function(a, b)
-        return palette.val(a) < palette.val(b)
-    end)
-    local counts, map = {}, {}
+    -- Group hexes by their nearest master color name.
+    local by_name = {}
     for _, hex in ipairs(hexes) do
         local base = palette.nearest(hex)
-        counts[base] = (counts[base] or 0) + 1
-        map[hex] = base .. "_" .. counts[base]
+        by_name[base] = by_name[base] or {}
+        table.insert(by_name[base], hex)
+    end
+    -- Within each name, order by lightness and number _1 (darkest) upward.
+    local map = {}
+    for base, list in pairs(by_name) do
+        table.sort(list, function(a, b)
+            return palette.lightness(a) < palette.lightness(b)
+        end)
+        for i, hex in ipairs(list) do
+            map[hex] = base .. "_" .. i
+        end
     end
     return map, hexes
 end

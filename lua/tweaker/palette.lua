@@ -75,6 +75,14 @@ local function oklab(hex)
     }
 end
 
+--- Perceptual lightness (OKLab L, ~0..1) of a "#rrggbb" hex. Used to order the
+--- shades within a color name as a clean dark -> light gradient.
+---@param hex string
+---@return number
+function M.lightness(hex)
+    return oklab(hex).L
+end
+
 -- Master colors grouped for naming: neutrals (by lightness) and chromatic
 -- families (base name without dark_/light_), each with a representative hue.
 local neutrals = nil -- { {name, L}, ... }
