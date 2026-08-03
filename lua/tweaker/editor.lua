@@ -68,11 +68,11 @@ local function apply(s, lnum, fg_raw, bg_raw)
         overrides.set(group, fg, bg)
         return
     end
-    -- Nothing deliberate. If we're editing the origin side of a group that was
-    -- originally a link/inherited (remembered in its override), clearing the cells
+    -- Nothing deliberate. If both cells are now empty and this group was
+    -- originally a link/inherited (remembered in its override), clearing them
     -- reverts the tweak: drop the override and restore the original link — even if
     -- the group was already overridden when the window opened.
-    if not desc.editing_target and overrides.has_base(group) then
+    if not desc.editing_target and fg_raw == "" and bg_raw == "" and overrides.has_base(group) then
         local base = overrides.clear(group)
         if base and base.link then
             desc.link = base.link -- reflect the restored link so the row renders as one
@@ -271,21 +271,27 @@ function M.attach(buf)
     vim.keymap.set("i", "<CR>", "<Esc>", { buffer = buf, nowait = true, silent = true })
 
     -- Backspace must stay inside the current field: at a field's start it would
-    -- otherwise join the row into the header (or cross into the previous field),
-    -- corrupting the fixed-width layout. Block it there; elsewhere it deletes
-    -- normally and live() re-pads. <C-h> often maps to backspace too.
+    -- otherwise join the row into the header (or cross into the previous field).
+    -- Plain (non-expr) mapping so the delete is unambiguous — an expr map's
+    -- returned key is easy to double-process into a no-op. <C-h> often == <BS>.
     local function guarded_bs()
-        local col = vim.api.nvim_win_get_cursor(0)[2]
+        local win = vim.api.nvim_get_current_win()
+        if vim.api.nvim_win_get_buf(win) ~= buf then
+            return
+        end
+        local pos = vim.api.nvim_win_get_cursor(win)
+        local row, col = pos[1] - 1, pos[2]
         local s = ui.get_session(buf)
         local field = (s and s.field) or (col < W and 1 or 2)
         local fstart = (field == 1) and 0 or W
         if col <= fstart then
-            return ""
+            return -- at field start: no-op (don't join lines / cross fields)
         end
-        return vim.keycode("<BS>")
+        pcall(vim.api.nvim_buf_set_text, buf, row, col - 1, row, col, {})
+        pcall(vim.api.nvim_win_set_cursor, win, { row + 1, col - 1 })
     end
     for _, k in ipairs({ "<BS>", "<C-h>" }) do
-        vim.keymap.set("i", k, guarded_bs, { buffer = buf, expr = true, nowait = true, silent = true })
+        vim.keymap.set("i", k, guarded_bs, { buffer = buf, nowait = true, silent = true })
     end
     -- Line/word kills can delete across field/line boundaries; disable them.
     for _, k in ipairs({ "<C-u>", "<C-w>" }) do
