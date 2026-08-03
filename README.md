@@ -196,8 +196,8 @@ option.
 Open a colorscheme that tweaker baked and it renders as a **live legend**: each
 group name in a `set(0, "Group", …)` call — and each `link = "Target"` — is drawn
 in that group's own appearance (fg/bg/bold/italic, with links resolved to their
-target's look), and every hex color gets a 2-cell **swatch block** shown right
-after it. It's parsed from the file's own `p = {…}` and `set()` calls, so the
+target's look), and a 2-cell **swatch block** is shown after every hex color and
+after every `p.<var>` palette reference. It's parsed from the file's own `p = {…}` and `set()` calls, so the
 preview is accurate even when a different colorscheme is active, and it's
 read-only decoration (it never changes the buffer or your highlights). Only files
 carrying tweaker's generated header are decorated; disable with `preview = false`.

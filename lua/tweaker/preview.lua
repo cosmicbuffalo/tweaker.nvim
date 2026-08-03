@@ -148,7 +148,7 @@ function M.decorate(buf)
     end
     vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
     local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-    local _, defs = parse(lines)
+    local palette, defs = parse(lines)
     for i, line in ipairs(lines) do
         local row = i - 1
 
@@ -165,6 +165,22 @@ function M.decorate(buf)
                 virt_text = { { " ██", swatch(hex) } },
                 virt_text_pos = "inline",
             })
+            from = e + 1
+        end
+
+        -- ...and the same swatch after every p.<var> palette reference.
+        from = 1
+        while true do
+            local s, e, v = line:find("p%.([%w_]+)", from)
+            if not s then
+                break
+            end
+            if palette[v] then
+                pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, e, {
+                    virt_text = { { " ██", swatch(palette[v]) } },
+                    virt_text_pos = "inline",
+                })
+            end
             from = e + 1
         end
 

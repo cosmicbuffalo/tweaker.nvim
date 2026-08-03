@@ -186,8 +186,8 @@ needs neither tweaker nor the base scheme installed — and **switches to it**.
 Opening a colorscheme that tweaker baked turns it into a **live legend**: each
 group name in a `set()` call — and each `link = "target"` — is rendered in that
 group's own appearance (colors, bold/italic, links resolved to their target), and
-every hex color gets a small solid **swatch block** shown next to it. It is parsed
-from the file's own palette and `set()` calls — not the active colorscheme — so it
+a small solid **swatch block** is shown next to every hex color and every
+`p.<var>` palette reference. It is parsed from the file's own palette and `set()` calls — not the active colorscheme — so it
 faithfully shows what *that file* defines, and it is purely read-only decoration.
 
 ## Guiding principles
