@@ -293,7 +293,41 @@ function M.rerender(buf)
     end
 end
 
---- The fixed-width real text (fg + bg fields) a row should have, derived from the
+--- Public: recompute column widths + window width from the current rows and
+--- re-render. Call after something changes a row's displayed width — e.g. a link
+--- reappears (its " → target" annotation widens the GROUP column) — so the header
+--- and columns stay aligned, the float grows to fit, and the link-toggle footer
+--- hint shows whenever a link is currently rendered (not just at open).
+function M.relayout(buf)
+    local s = sessions[buf]
+    if not s or not s.has_data or not s.rows then
+        return
+    end
+    local sw, gw, pw = #"SOURCE", #"GROUP", #"PRIORITY"
+    local has_link = false
+    for _, desc in pairs(s.rows) do
+        sw = math.max(sw, #(desc.source or ""))
+        local linked = desc.link and desc.link ~= ""
+        has_link = has_link or linked
+        local ann = linked and (" → " .. desc.link) or ""
+        gw = math.max(gw, vim.fn.strdisplaywidth((desc.group or "") .. ann))
+        pw = math.max(pw, #(desc.priority or ""))
+    end
+    s.widths = { sw = sw, gw = gw, pw = pw }
+    local total_w = sw + GAP + gw + GAP + FIELD_W + GAP + FIELD_W + GAP + pw
+    if s.win and vim.api.nvim_win_is_valid(s.win) then
+        local cfg = { width = math.min(total_w + 1, vim.o.columns - 4) }
+        if has_link then
+            cfg.footer = " <C-t> edit linked group "
+            cfg.footer_pos = "right"
+        else
+            cfg.footer = ""
+        end
+        pcall(vim.api.nvim_win_set_config, s.win, cfg)
+    end
+    M.rerender(buf)
+end
+
 --- live highlight state (edits apply live, so this is the source of truth). Linked
 --- rows are blank; a row toggled to its target shows the target's own colors.
 local function row_content(desc)
@@ -631,6 +665,9 @@ function M.open(title, items, opts)
     end
 
     local win = vim.api.nvim_open_win(buf, true, cfg)
+    if sessions[buf] then
+        sessions[buf].win = win -- so relayout() can resize the float
+    end
     vim.wo[win].wrap = false
     vim.wo[win].cursorline = false
     -- Route the float's colors through the explicit Tweaker groups (not Normal).

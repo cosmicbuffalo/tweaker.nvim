@@ -85,11 +85,12 @@ local function apply(s, lnum, fg_raw, bg_raw)
     end
     if fg_set or bg_set then
         overrides.set(group, fg, bg, desc.orig)
-        return
+        return false
     end
     -- Nothing deliberate. If both cells are now empty and this group has a live
     -- override that we know how to revert (its open-time definition, or the link
     -- the override remembered), clearing the cells restores the original link.
+    local relinked = false
     if not desc.editing_target and fg_raw == "" and bg_raw == "" and overrides.has(group) then
         if desc.orig ~= nil then
             log.write("  -> restore via desc.orig " .. (vim.inspect(desc.orig):gsub("%s+", " ")))
@@ -99,12 +100,14 @@ local function apply(s, lnum, fg_raw, bg_raw)
             local base = overrides.clear(group)
             if not desc.link and base and base.link then
                 desc.link = base.link -- reopened concrete row: show it as a link again
+                relinked = true -- the GROUP column just widened; caller must relayout
             end
         else
             log.write("  -> no restore source (orig nil, no base)")
         end
     end
     -- otherwise leave the group (and any link) untouched
+    return relinked
 end
 
 --- Common context for a change on the current line, or nil if it should be
@@ -165,8 +168,12 @@ local function live(buf)
     end
     local cur = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
     local _, fg, bg = split(cur, field)
-    apply(s, lnum, fg, bg)
-    ui.rerender(buf) -- after apply so the group swatch reflects the new/restored color
+    local relinked = apply(s, lnum, fg, bg)
+    if relinked then
+        ui.relayout(buf) -- link reappeared: widen/realign columns + window
+    else
+        ui.rerender(buf) -- after apply so the group swatch reflects the new/restored color
+    end
 end
 
 --- Normal-mode change / InsertLeave: normalize the line back to fixed width
@@ -195,8 +202,12 @@ local function settle(buf)
         local col = math.min(math.max(win and vim.api.nvim_win_get_cursor(win)[2] or fstart, fstart), fstart + #val)
         pcall(vim.api.nvim_win_set_cursor, win, { lnum, math.min(col, fstart + W - 1) })
     end
-    apply(s, lnum, fg, bg)
-    ui.rerender(buf) -- after apply so the group swatch reflects the new/restored color
+    local relinked = apply(s, lnum, fg, bg)
+    if relinked then
+        ui.relayout(buf) -- link reappeared: widen/realign columns + window
+    else
+        ui.rerender(buf) -- after apply so the group swatch reflects the new/restored color
+    end
     overrides.autosave()
 end
 
