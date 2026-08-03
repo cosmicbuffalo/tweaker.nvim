@@ -67,10 +67,10 @@ end
 
 --- Record an override for `group` (fg/bg are "#rrggbb" or nil) and apply it live.
 --- The first time a group is overridden we remember how to relink it later
---- (`base`): its explicit link, or that it was empty (falls back through a
---- treesitter @-hierarchy). Captured before applying, while the group still has
---- its original definition, and persisted so it survives restarts.
-function M.set(group, fg, bg)
+--- (`base`): the caller can pass `base_hint` (the row's open-time definition,
+--- e.g. `{ link = provider }`); otherwise we derive it from the group's current
+--- definition. Persisted so it survives restarts.
+function M.set(group, fg, bg, base_hint)
     local s = scheme()
     local d = data()
     d[s] = d[s] or {}
@@ -78,6 +78,8 @@ function M.set(group, fg, bg)
     local base
     if existing then
         base = existing.base
+    elseif base_hint ~= nil then
+        base = base_hint
     else
         local raw = vim.api.nvim_get_hl(0, { name = group })
         if type(raw) == "table" and raw.link then

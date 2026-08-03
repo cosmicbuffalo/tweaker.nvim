@@ -1,6 +1,7 @@
 local util = require("tweaker.util")
 local ui = require("tweaker.ui")
 local overrides = require("tweaker.overrides")
+local log = require("tweaker.log")
 
 local M = {}
 
@@ -64,8 +65,26 @@ local function apply(s, lnum, fg_raw, bg_raw)
     end
     local fg, fg_set = cell(fg_raw, own_fg)
     local bg, bg_set = cell(bg_raw, own_bg)
+    if log.enabled() then
+        log.write(
+            string.format(
+                "apply lnum=%d group=%s target=%s fg=%q bg=%q fg_set=%s bg_set=%s has=%s has_base=%s orig=%s link=%s",
+                lnum,
+                group,
+                tostring(desc.editing_target),
+                fg_raw,
+                bg_raw,
+                tostring(fg_set),
+                tostring(bg_set),
+                tostring(overrides.has(group)),
+                tostring(overrides.has_base(group)),
+                (vim.inspect(desc.orig):gsub("%s+", " ")),
+                tostring(desc.link)
+            )
+        )
+    end
     if fg_set or bg_set then
-        overrides.set(group, fg, bg)
+        overrides.set(group, fg, bg, desc.orig)
         return
     end
     -- Nothing deliberate. If both cells are now empty and this group has a live
@@ -73,12 +92,16 @@ local function apply(s, lnum, fg_raw, bg_raw)
     -- the override remembered), clearing the cells restores the original link.
     if not desc.editing_target and fg_raw == "" and bg_raw == "" and overrides.has(group) then
         if desc.orig ~= nil then
+            log.write("  -> restore via desc.orig " .. (vim.inspect(desc.orig):gsub("%s+", " ")))
             overrides.clear(group, desc.orig)
         elseif overrides.has_base(group) then
+            log.write("  -> restore via base")
             local base = overrides.clear(group)
             if not desc.link and base and base.link then
                 desc.link = base.link -- reopened concrete row: show it as a link again
             end
+        else
+            log.write("  -> no restore source (orig nil, no base)")
         end
     end
     -- otherwise leave the group (and any link) untouched
@@ -114,9 +137,11 @@ end
 local function live(buf)
     local s, _, lnum, field = ctx(buf)
     if not s or s.adjusting then
+        log.write("live bail: s=" .. tostring(s ~= nil) .. " adjusting=" .. tostring(s and s.adjusting))
         return
     end
     if s.suppress then
+        log.write("live bail: suppress")
         s.suppress = false
         return
     end
@@ -330,7 +355,9 @@ function M.attach(buf)
         group = grp,
         buffer = buf,
         callback = function()
-            if not ui.resync(buf) then
+            local repaired = ui.resync(buf)
+            log.write("TextChangedI resync=" .. tostring(repaired))
+            if not repaired then
                 live(buf)
             end
         end,
@@ -339,7 +366,9 @@ function M.attach(buf)
         group = grp,
         buffer = buf,
         callback = function()
-            if not ui.resync(buf) then
+            local repaired = ui.resync(buf)
+            log.write("TextChanged resync=" .. tostring(repaired))
+            if not repaired then
                 settle(buf)
             end
         end,

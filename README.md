@@ -92,6 +92,11 @@ vim.api.nvim_set_hl(0, "TweakerBorder", { fg = "#e6c200", bg = "#101010" })
 | `:TweakerOpenOverrides` | Open the overrides JSON file in the current window.             |
 | `:TweakerBake[!] [name]` | Bake the current highlights + your tweaks into a standalone colorscheme `colors/<name>.lua` and switch to it. On a scheme you already baked, re-bakes it in place; otherwise writes `<active>-tweaked` (bang to overwrite a different existing file). |
 
+Run `:checkhealth tweaker` to verify your setup (Neovim version, `termguicolors`,
+the overrides file). For editing issues, enable a debug log with
+`:lua vim.g.tweaker_debug = true`, reproduce, then read the log path shown in
+`:checkhealth tweaker`.
+
 Table columns: `SOURCE · GROUP · FG · BG · PRIORITY`. **FG and BG are editable**
 (PRIORITY is read-only for now). Navigate between the FG/BG cells with normal Vim
 motions (or `<Tab>`/`<S-Tab>`); edit a cell with normal editing. Accepted values:

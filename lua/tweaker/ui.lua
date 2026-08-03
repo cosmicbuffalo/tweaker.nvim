@@ -109,15 +109,16 @@ local function build(items)
             link = it.link
         end
         has_link = has_link or (link ~= nil and link ~= "")
-        -- How to restore this row if a tweak is later cleared: an explicit link
-        -- relinks as { link = target }; an inherited (@-hierarchy) row restores as
-        -- {} (empty → falls back through the hierarchy). Captured from the live
-        -- state at open, so it works even independent of the override's own memory.
+        -- How to restore this row if a tweak is later cleared: relink to the
+        -- provider. NB an inherited (@-hierarchy) row must relink to its resolved
+        -- provider (e.g. @string.lua -> String), NOT be set to {} — an
+        -- empty-but-defined highlight blocks the hierarchy fallback and renders as
+        -- no color instead of returning to the inherited color.
         local orig
         if own.link then
             orig = { link = own.link }
         elseif link and link ~= "" then
-            orig = {}
+            orig = { link = link }
         end
         local r = {
             source = it.source or "",
