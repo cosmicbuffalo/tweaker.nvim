@@ -1,3 +1,5 @@
+--- Small shared helpers: hex conversion, highlight resolution (own vs linked),
+--- and color-string parsing.
 local M = {}
 
 --- Convert a 24-bit integer color (as returned by nvim_get_hl) to "#rrggbb".

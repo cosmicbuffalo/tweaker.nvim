@@ -1,3 +1,5 @@
+--- Editing behavior for the float: fixed-width fg/bg fields, live apply, link
+--- unlink/restore, the <C-t> link-target toggle, and RGB stepping.
 local util = require("tweaker.util")
 local ui = require("tweaker.ui")
 local overrides = require("tweaker.overrides")
@@ -93,7 +95,9 @@ local function apply(s, lnum, fg_raw, bg_raw)
     local relinked = false
     if not desc.editing_target and fg_raw == "" and bg_raw == "" and overrides.has(group) then
         if desc.orig ~= nil then
-            log.write("  -> restore via desc.orig " .. (vim.inspect(desc.orig):gsub("%s+", " ")))
+            if log.enabled() then
+                log.write("  -> restore via desc.orig " .. (vim.inspect(desc.orig):gsub("%s+", " ")))
+            end
             overrides.clear(group, desc.orig)
         elseif overrides.has_base(group) then
             log.write("  -> restore via base")
@@ -140,7 +144,9 @@ end
 local function live(buf)
     local s, _, lnum, field = ctx(buf)
     if not s or s.adjusting then
-        log.write("live bail: s=" .. tostring(s ~= nil) .. " adjusting=" .. tostring(s and s.adjusting))
+        if log.enabled() then
+            log.write("live bail: s=" .. tostring(s ~= nil) .. " adjusting=" .. tostring(s and s.adjusting))
+        end
         return
     end
     if s.suppress then
@@ -367,7 +373,9 @@ function M.attach(buf)
         buffer = buf,
         callback = function()
             local repaired = ui.resync(buf)
-            log.write("TextChangedI resync=" .. tostring(repaired))
+            if log.enabled() then
+                log.write("TextChangedI resync=" .. tostring(repaired))
+            end
             if not repaired then
                 live(buf)
             end
@@ -378,7 +386,9 @@ function M.attach(buf)
         buffer = buf,
         callback = function()
             local repaired = ui.resync(buf)
-            log.write("TextChanged resync=" .. tostring(repaired))
+            if log.enabled() then
+                log.write("TextChanged resync=" .. tostring(repaired))
+            end
             if not repaired then
                 settle(buf)
             end

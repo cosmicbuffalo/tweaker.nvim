@@ -1,3 +1,5 @@
+--- tweaker.nvim entry point: configuration, and the user commands
+--- (:Tweaker, :TweakerToggle/Save/Load, :TweakerBake, …).
 local M = {}
 
 ---@class tweaker.Config

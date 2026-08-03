@@ -1,3 +1,6 @@
+--- The floating-window UI: builds the table, draws all chrome (header, group
+--- names, swatches, leader line) as extmarks, and manages placement, cursor
+--- confinement, and re-layout.
 local util = require("tweaker.util")
 local overrides = require("tweaker.overrides")
 
@@ -404,7 +407,7 @@ local JOIN_TOP_R = "┤" -- straight down onto the top-right corner
 --- right behind the last character but never cross into the gap/next column.
 local function confine(buf)
     local s = sessions[buf]
-    if not s or not s.has_data or s.normalizing then
+    if not s or not s.has_data then
         return
     end
     local win = vim.api.nvim_get_current_win()
@@ -626,7 +629,6 @@ function M.open(title, items, opts)
         last = layout.last or 1,
         has_data = layout.has_data,
         editable = editable,
-        src = opts.source,
     }
 
     if layout.has_data then

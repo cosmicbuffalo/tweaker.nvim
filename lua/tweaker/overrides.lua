@@ -43,8 +43,8 @@ local function apply_group(group, ov)
     if not group or group == "" then
         return
     end
-    local raw = vim.api.nvim_get_hl(0, { name = group })
-    local base = (type(raw) == "table" and not raw.link) and vim.deepcopy(raw) or {}
+    local ok, raw = pcall(vim.api.nvim_get_hl, 0, { name = group })
+    local base = (ok and type(raw) == "table" and not raw.link) and vim.deepcopy(raw) or {}
     base.link = nil
     base.fg = ov.fg
     base.bg = ov.bg
@@ -81,10 +81,10 @@ function M.set(group, fg, bg, base_hint)
     elseif base_hint ~= nil then
         base = base_hint
     else
-        local raw = vim.api.nvim_get_hl(0, { name = group })
-        if type(raw) == "table" and raw.link then
+        local ok, raw = pcall(vim.api.nvim_get_hl, 0, { name = group })
+        if ok and type(raw) == "table" and raw.link then
             base = { link = raw.link }
-        elseif type(raw) == "table" and vim.tbl_isempty(raw) then
+        elseif ok and type(raw) == "table" and vim.tbl_isempty(raw) then
             base = { inherit = true }
         end
     end
@@ -228,10 +228,6 @@ function M.toggle()
     state.enabled = not state.enabled
     refresh()
     vim.notify("tweaker: overrides " .. (state.enabled and "ON" or "OFF"), vim.log.levels.INFO)
-    return state.enabled
-end
-
-function M.is_enabled()
     return state.enabled
 end
 

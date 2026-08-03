@@ -1,10 +1,13 @@
+--- Collects the highlight groups contributing at a cursor position (treesitter,
+--- LSP semantic tokens, syntax, extmarks), deduped and sorted by draw priority.
 local util = require("tweaker.util")
 
 local M = {}
 
 -- Neovim's canonical priority ladder: syntax=50, treesitter=100,
--- semantic_tokens=125, diagnostics=150, user=200.
-local PRI = vim.hl.priorities
+-- semantic_tokens=125, diagnostics=150, user=200. (vim.hl on 0.11+, vim.highlight
+-- on 0.10 — the namespace was renamed.)
+local PRI = (vim.hl or vim.highlight).priorities
 
 ---@class tweaker.Item
 ---@field source string      one of "treesitter"|"semantic"|"syntax"|"extmark"
@@ -18,7 +21,7 @@ local PRI = vim.hl.priorities
 ---@param bufnr integer|nil
 ---@param row integer  0-indexed
 ---@param col integer  0-indexed
----@return tweaker.Item[] items, table info  raw inspect_pos result
+---@return tweaker.Item[] items
 function M.collect(bufnr, row, col)
     bufnr = bufnr or vim.api.nvim_get_current_buf()
 
@@ -84,7 +87,7 @@ function M.collect(bufnr, row, col)
         end
     end
 
-    return unique, info
+    return unique
 end
 
 return M

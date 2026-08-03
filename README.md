@@ -18,7 +18,8 @@ your Tweaker overrides into a new color scheme file!
 
 ## Requirements
 
-- Neovim >= 0.10 (uses `vim.inspect_pos`, `vim.hl.priorities`)
+- Neovim >= 0.10 (uses `vim.inspect_pos`, `vim.uv`, and the highlight-priority
+  ladder — `vim.highlight.priorities` on 0.10, `vim.hl.priorities` on 0.11+)
 
 ## Install (lazy.nvim)
 
@@ -228,8 +229,8 @@ whole preview with `preview = false`.
 Highlight sources are gathered with `vim.inspect_pos`, which reports treesitter
 captures, LSP semantic tokens, `:syntax` groups, and extmarks — each already
 carrying its highlight group and draw priority. Priorities follow Neovim's
-ladder (`vim.hl.priorities`): syntax `50`, treesitter `100`, semantic tokens
-`125`, up to user extmarks `200`.
+ladder (`vim.hl.priorities`, or `vim.highlight.priorities` on 0.10): syntax `50`,
+treesitter `100`, semantic tokens `125`, up to user extmarks `200`.
 
 ## License
 

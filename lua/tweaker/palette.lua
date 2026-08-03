@@ -32,13 +32,13 @@ local NEUTRAL_CHROMA = 0.045
 -- dark_/light_ prefix (OKLab L units).
 local VAR_MARGIN = 0.13
 
---- Numeric value of a "#rrggbb" string, for sorting.
-function M.val(hex)
+--- Numeric value of a "#rrggbb" string.
+local function val(hex)
     return tonumber(hex:sub(2), 16) or 0
 end
 
 local function channels(hex)
-    local n = M.val(hex)
+    local n = val(hex)
     return math.floor(n / 65536) % 256, math.floor(n / 256) % 256, n % 256
 end
 

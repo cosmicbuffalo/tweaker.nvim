@@ -2,20 +2,15 @@
 --- state useful for debugging (override file, debug log, conflicting maps).
 local M = {}
 
-local function report()
-    -- vim.health is the modern API; fall back for older signatures.
-    return vim.health
-end
-
 function M.check()
-    local h = report()
+    local h = vim.health
     h.start("tweaker.nvim")
 
     -- Neovim version
     if vim.fn.has("nvim-0.10") == 1 then
         h.ok("Neovim " .. tostring(vim.version()) .. " (>= 0.10)")
     else
-        h.error("Neovim 0.10+ is required (uses vim.inspect_pos, vim.hl.priorities)")
+        h.error("Neovim 0.10+ is required (uses vim.inspect_pos, vim.uv)")
     end
 
     -- True color
