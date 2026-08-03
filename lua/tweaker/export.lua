@@ -57,22 +57,49 @@ local function build_vars(used)
     return map, ordered
 end
 
+-- Machine-generated / transient highlight groups that shouldn't be baked into a
+-- colorscheme: Neovim's per-color LSP document-color groups, and tweaker's own
+-- ephemeral swatch/preview groups. Users can add patterns via the `bake_ignore`
+-- config option.
+local DEFAULT_IGNORE = {
+    "^LspDocumentColor_",
+    "^TweakerSwatch",
+    "^TweakerPv",
+    "^TweakerPreview",
+}
+
+local function ignored(name)
+    for _, pat in ipairs(DEFAULT_IGNORE) do
+        if name:match(pat) then
+            return true
+        end
+    end
+    for _, pat in ipairs((require("tweaker").config or {}).bake_ignore or {}) do
+        if name:match(pat) then
+            return true
+        end
+    end
+    return false
+end
+
 --- Build the colorscheme source text.
 ---@param name string  colorscheme name
 ---@return string
 function M.generate(name)
     local groups = vim.api.nvim_get_hl(0, {})
 
-    -- Collect used hex colors and the emittable groups.
+    -- Collect used hex colors and the emittable groups (skipping transient ones).
     local used = {}
     local names = {}
     for gname, def in pairs(groups) do
-        for _, k in ipairs(HEX_KEYS) do
-            if type(def[k]) == "number" then
-                used[util.hex(def[k])] = true
+        if not ignored(gname) then
+            for _, k in ipairs(HEX_KEYS) do
+                if type(def[k]) == "number" then
+                    used[util.hex(def[k])] = true
+                end
             end
+            names[#names + 1] = gname
         end
-        names[#names + 1] = gname
     end
     table.sort(names)
     local var, ordered = build_vars(used)

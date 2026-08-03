@@ -5,10 +5,12 @@ local M = {}
 ---@field path string|nil    override file location
 ---@field colors table|nil   extra/override master colors ({ name = "#hex" }) for export naming
 ---@field preview boolean|nil render baked colorscheme files as a live legend (default true)
+---@field bake_ignore string[]|nil  extra Lua patterns of highlight groups to skip when baking
 local defaults = {
     auto_save = false,
     colors = {},
     preview = true,
+    bake_ignore = {},
 }
 
 M.config = vim.deepcopy(defaults)

@@ -61,6 +61,10 @@ your Tweaker overrides into a new color scheme file!
     -- Render tweaker-baked colorscheme files as a live legend when you open them
     -- (group/link names shown in their own highlight, a swatch block after each hex).
     preview = true,
+
+    -- Extra Lua patterns of highlight groups to skip when baking. Machine-generated
+    -- groups (Neovim's LspDocumentColor_*, tweaker's own swatches) are always skipped.
+    bake_ignore = {},
 }
 ```
 
