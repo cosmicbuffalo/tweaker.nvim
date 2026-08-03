@@ -131,13 +131,13 @@ Every unique color is hoisted into a named **palette variable** referenced by th
 
 ```lua
 local p = {
-  black_1     = "#000000",
-  gray_1      = "#767676",
-  white_1     = "#ffffff",
-  red_1       = "#ff0000",
-  blue_1      = "#0078d4",
-  blue_2      = "#5599dd",
-  light_blue_1 = "#00a2ff",
+  black_1     = "#000000", -- 1 group: Normal
+  gray_1      = "#767676", -- 2 groups: Comment, LineNr
+  white_1     = "#ffffff", -- 1 group: CursorLine
+  red_1       = "#ff0000", -- 1 group: Error
+  blue_1      = "#0078d4", -- 3 groups: Function, Identifier, Type
+  blue_2      = "#5599dd", -- 1 group: Special
+  light_blue_1 = "#00a2ff", -- 1 group: Title
   -- … grouped by name, laid out as a gradient …
 }
 local set = vim.api.nvim_set_hl
@@ -145,7 +145,9 @@ set(0, "Normal",  { fg = p.light_blue_1, bg = p.black_1 })
 set(0, "Comment", { fg = p.gray_1, italic = true })
 ```
 
-Variable names come from the nearest match in a perceptual color space (OKLCh):
+Each palette entry carries a comment listing how many highlight groups use that
+color and which ones (links carry no color, so they're excluded). Variable names
+come from the nearest match in a perceptual color space (OKLCh):
 low-chroma colors are named among the neutrals (`black`/`gray`/`white`) by
 lightness, and chromatic colors pick a family by hue (`red`/`blue`/`purple`/…),
 then a `dark_`/`light_` variant relative to that family's own lightness. The

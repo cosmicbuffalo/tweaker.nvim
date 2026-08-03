@@ -77,6 +77,27 @@ function M.generate(name)
     table.sort(names)
     local var, ordered = build_vars(used)
 
+    -- Which groups use each color (by hex), for the palette comments. Links
+    -- carry no color of their own, so they never appear here. A group that uses
+    -- the same color for more than one attribute is counted once.
+    local usage = {}
+    for _, gname in ipairs(names) do
+        local def = groups[gname]
+        if not def.link then
+            local seen = {}
+            for _, k in ipairs(HEX_KEYS) do
+                if type(def[k]) == "number" then
+                    local hx = util.hex(def[k])
+                    if not seen[hx] then
+                        seen[hx] = true
+                        usage[hx] = usage[hx] or {}
+                        usage[hx][#usage[hx] + 1] = gname
+                    end
+                end
+            end
+        end
+    end
+
     local out = {}
     local function add(line)
         out[#out + 1] = line
@@ -89,14 +110,26 @@ function M.generate(name)
     add("")
 
     -- Palette table, laid out as a gradient (grouped by color name, groups in
-    -- spectral order, shades dark -> light), aligned for readability.
+    -- spectral order, shades dark -> light), aligned for readability. Each entry
+    -- notes how many highlight groups use that color, and which.
     add("local p = {")
     local w = 0
     for _, hex in ipairs(ordered) do
         w = math.max(w, #var[hex])
     end
     for _, hex in ipairs(ordered) do
-        add(string.format("  %-" .. w .. 's = "%s",', var[hex], hex))
+        local groups_using = usage[hex] or {}
+        local n = #groups_using
+        add(
+            string.format(
+                "  %-" .. w .. 's = "%s", -- %d group%s: %s',
+                var[hex],
+                hex,
+                n,
+                n == 1 and "" or "s",
+                table.concat(groups_using, ", ")
+            )
+        )
     end
     add("}")
     add("")
