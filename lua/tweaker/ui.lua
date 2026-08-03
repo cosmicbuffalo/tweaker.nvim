@@ -41,9 +41,10 @@ local function ensure_hl()
         TweakerEmpty = { link = "Comment" },
     }
     -- Struck-through "→ target" when an edit stages an unlink. Grayed like a
-    -- comment, so it reads as "this link is going away".
+    -- comment, with italic + strikethrough; the arrow is also swapped for "✗" so
+    -- the broken-link state shows even where strikethrough doesn't render.
     local ok_c, comment = pcall(vim.api.nvim_get_hl, 0, { name = "Comment", link = false })
-    defs.TweakerStrike = { fg = (ok_c and comment.fg) or "#808080", strikethrough = true }
+    defs.TweakerStrike = { fg = (ok_c and comment.fg) or "#808080", strikethrough = true, italic = true }
     for name, val in pairs(defs) do
         val.default = true
         vim.api.nvim_set_hl(0, name, val)
@@ -236,9 +237,12 @@ local function render_line(buf, lnum, desc, w)
             local bgv = util.parse_color(trim(line:sub(bg_start + 1, bg_end)))
             pending = fgv ~= nil or bgv ~= nil
         end
+        -- Swapping the arrow for ✗ is the primary, attribute-independent signal;
+        -- the italic + strikethrough on TweakerStrike are extra cues on top.
+        local arrow = pending and " ✗ " or " → "
         local arrow_hl = pending and "TweakerStrike" or "TweakerSource"
         local target_hl = pending and "TweakerStrike" or name_hl(desc.link, not origin_active)
-        vt[#vt + 1] = { " → ", arrow_hl }
+        vt[#vt + 1] = { arrow, arrow_hl }
         vt[#vt + 1] = { desc.link, target_hl }
         used = used + vim.fn.strdisplaywidth(" → " .. desc.link)
     end

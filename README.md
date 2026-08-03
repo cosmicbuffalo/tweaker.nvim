@@ -107,10 +107,12 @@ capture colored through the `@`-hierarchy (e.g. `@string.lua` resolving to
 from the target). You can change it two ways:
 
 - **Unlink it:** type a color into an FG/BG cell — this immediately gives the
-  group that color of its own, breaking the link **live**. The `→ target`
-  annotation is struck through while a value is set; delete it to drop the tweak
-  and restore the original link. (Like every edit, this applies live via
-  `nvim_set_hl`; `:TweakerSave` / `auto_save` only persist it to disk.)
+  group that color of its own, breaking the link **live**. While a value is set,
+  the arrow turns `→` → `✗` and the target is shown italic + struck through
+  (the arrow swap shows even where your terminal can't draw strikethrough); delete
+  the value to drop the tweak and restore the original link. (Like every edit,
+  this applies live via `nvim_set_hl`; `:TweakerSave` / `auto_save` only persist
+  it to disk.)
 - **Edit the target instead:** press `<C-t>` to point the row at the linked-to
   group (there's a hint at the bottom of the window). The group name goes gray and
   the target lights up in its real color, and the FG/BG fields fill with the

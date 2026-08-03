@@ -113,7 +113,9 @@ editing a colorscheme file and reloading to see the effect.
   target, not itself). There are two ways to change it:
   - **Unlink it:** typing a color into a blank cell gives the group that color
     directly, breaking the link **live** (as with every edit). While a value is
-    set, the `→ target` annotation is shown **struck through**; clearing the value
+    set, the link is shown broken with several redundant cues — the arrow turns
+    `→` → `✗`, and the target is italicized and struck through — so it reads
+    clearly even where a terminal can't render strikethrough. Clearing the value
     drops the override and restores the original link.
   - **Retarget the editor:** a keymap (`<C-t>`, hinted at the bottom of the window,
     and only when a linked row exists) toggles the row between editing the group
