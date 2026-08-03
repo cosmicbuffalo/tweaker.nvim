@@ -169,7 +169,10 @@ function M.decorate(buf)
         -- set() call: render the group name in its own appearance, tint p.<var>s.
         local group = line:match('set%(%s*0%s*,%s*"([^"]+)"')
         if group then
-            local q = line:find('"' .. vim.pesc(group) .. '"', 1, true)
+            -- Plain (literal) search — do NOT vim.pesc here: with plain=true the
+            -- needle is literal, so escaping would make dotted names like
+            -- "@markup.list.unchecked" search for literal "%." and never match.
+            local q = line:find('"' .. group .. '"', 1, true)
             if q then
                 local a = resolved_attrs(group, defs, {})
                 mark(buf, row, q, q + #group, a and ephemeral(a))
