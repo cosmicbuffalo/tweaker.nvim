@@ -1,0 +1,164 @@
+*tweaker.txt*              Inspect, live-edit, and bake Neovim highlight colors
+
+==============================================================================
+CONTENTS                                                       *tweaker-contents*
+
+  1. Introduction ......................... |tweaker-introduction|
+  2. Requirements ......................... |tweaker-requirements|
+  3. Setup ................................ |tweaker-setup|
+  4. Configuration ........................ |tweaker-configuration|
+  5. Commands ............................. |tweaker-commands|
+  6. The window ........................... |tweaker-window|
+  7. Linked groups ........................ |tweaker-links|
+  8. Persistence .......................... |tweaker-persistence|
+  9. Bake ................................. |tweaker-bake|
+ 10. Preview .............................. |tweaker-preview|
+ 11. Highlights ........................... |tweaker-highlights|
+ 12. Health ............................... |tweaker-health|
+
+==============================================================================
+1. INTRODUCTION                                            *tweaker-introduction*
+
+tweaker.nvim lets you inspect, live-edit, and persist highlight-group colors
+from a floating window — seeing changes applied to the running session as you
+type — then bake your accumulated tweaks into a standalone, shareable
+colorscheme.
+
+==============================================================================
+2. REQUIREMENTS                                            *tweaker-requirements*
+
+Neovim >= 0.10. Uses `vim.inspect_pos`, `vim.uv`, and the highlight-priority
+ladder (`vim.highlight.priorities` on 0.10, `vim.hl.priorities` on 0.11+).
+Requires `termguicolors`.
+
+==============================================================================
+3. SETUP                                                          *tweaker-setup*
+
+With lazy.nvim: >lua
+    {
+      "cosmicbuffalo/tweaker.nvim",
+      lazy = false,   -- so persisted overrides re-apply on startup
+      opts = {},
+    }
+<
+`opts` is passed to `require("tweaker").setup()`.
+
+==============================================================================
+4. CONFIGURATION                                          *tweaker-configuration*
+
+Defaults: >lua
+    {
+      -- Persist overrides to disk on every committed edit. When false, edits
+      -- stay in the session until :TweakerSave.
+      auto_save = false,
+
+      -- Where overrides are stored (JSON, keyed per colorscheme).
+      path = vim.fn.stdpath("data") .. "/tweaker/overrides.json",
+
+      -- Extra/override anchor colors ({ name = "#hex" }) used to name palette
+      -- variables in :TweakerBake. Merged over the built-in anchors.
+      colors = {},
+
+      -- Render baked colorscheme files as a live legend when opened.
+      preview = true,
+
+      -- Extra Lua patterns of highlight groups to skip when baking.
+      bake_ignore = {},
+    }
+<
+==============================================================================
+5. COMMANDS                                                    *tweaker-commands*
+
+                                                                      *:Tweaker*
+:Tweaker [group...]      Open an editable float. With no arguments, edit the
+                         groups under the cursor; with names, edit those groups.
+
+                                                                *:TweakerToggle*
+:TweakerToggle           Toggle application of your overrides on/off.
+
+                                                                  *:TweakerSave*
+:TweakerSave             Persist the current overrides to disk.
+
+                                                                  *:TweakerLoad*
+:TweakerLoad             Discard unsaved tweaks and reload from disk.
+
+                                                         *:TweakerOpenOverrides*
+:TweakerOpenOverrides    Open the overrides JSON file.
+
+                                                                  *:TweakerBake*
+:TweakerBake[!] [name]   Bake current highlights + tweaks into a standalone
+                         colorscheme `colors/<name>.lua` and switch to it. On a
+                         scheme you already baked, re-bakes it in place;
+                         otherwise writes `<active>-tweaked`. Bang overwrites a
+                         different existing file. See |tweaker-bake|.
+
+                                                       *:TweakerToggleSwatches*
+:TweakerToggleSwatches   Toggle the color swatches in the baked-file preview.
+
+==============================================================================
+6. THE WINDOW                                                    *tweaker-window*
+
+Columns: SOURCE, GROUP, FG, BG, PRIORITY. FG and BG are editable (PRIORITY is
+read-only for now). Navigate FG/BG with normal motions or <Tab>/<S-Tab>; edit
+with normal editing. Accepted values: a hex color `#rrggbb`, or `NONE`.
+
+Changes apply live via `nvim_set_hl` as you type. With the cursor over a hex
+code, <M-Up> / <M-Down> increment / decrement the R/G/B component under the
+cursor. Close with `q` or <C-c>.
+
+==============================================================================
+7. LINKED GROUPS                                                  *tweaker-links*
+
+A group whose color is inherited — an explicit link, or a treesitter capture
+resolved through the @-hierarchy (e.g. @string.lua -> String) — is shown as
+`group -> target` with blank cells. Two ways to change it:
+
+- Unlink: type a color into a cell. It applies live (breaking the link); the
+  arrow becomes an X while a value is set. Delete the value to restore the link.
+- Retarget: press <C-t> to edit the linked-to group directly instead. Press
+  again to switch back. Only the row under the cursor toggles.
+
+==============================================================================
+8. PERSISTENCE                                              *tweaker-persistence*
+
+Overrides are stored per-colorscheme in a JSON file and re-applied on startup
+and whenever the colorscheme changes. With `auto_save = false` (default), edits
+live in the session until |:TweakerSave|; |:TweakerLoad| discards unsaved
+edits. |:TweakerToggle| flips all overrides off/on.
+
+==============================================================================
+9. BAKE                                                           *tweaker-bake*
+
+|:TweakerBake| writes a standalone colorscheme snapshotting every highlight
+group (base + your tweaks). Every unique color is hoisted into a named palette
+variable (`red_1`, `light_blue_2`, ...) referenced by the `set` calls, named by
+perceptual (OKLCh) nearest-match and laid out as a gradient. Machine-generated
+groups (Neovim's LspDocumentColor_*, tweaker's own swatches) and any
+`bake_ignore` patterns are skipped.
+
+==============================================================================
+10. PREVIEW                                                    *tweaker-preview*
+
+Opening a baked colorscheme renders it as a live legend: group names (and link
+targets) are drawn in their own appearance, and a swatch is shown after every
+hex color and `p.<var>` reference. Read-only; only files with tweaker's header
+are decorated. Toggle swatches with |:TweakerToggleSwatches| or disable with
+`preview = false`.
+
+==============================================================================
+11. HIGHLIGHTS                                              *tweaker-highlights*
+
+The window's colors come from dedicated, overridable groups (not linked to
+Normal): `TweakerNormal`, `TweakerBorder`, `TweakerConnector`, `TweakerCursor`,
+`TweakerHeader`, `TweakerSource`, `TweakerPriority`, `TweakerEmpty`,
+`TweakerStrike`.
+
+==============================================================================
+12. HEALTH                                                      *tweaker-health*
+
+Run `:checkhealth tweaker` to verify Neovim version, `termguicolors`, and the
+overrides file. For editing issues, enable a debug log with
+`:lua vim.g.tweaker_debug = true`, reproduce, then read the log path shown in
+the health report.
+
+vim:tw=78:ts=8:ft=help:norl:

@@ -1,2 +1,5 @@
 # reserved for future persisted overrides in dev checkouts
 *.tmp
+
+# generated help tags
+doc/tags
