@@ -148,25 +148,28 @@ function M.decorate(buf)
     end
     vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
     local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-    local palette, defs = parse(lines)
+    local _, defs = parse(lines)
     for i, line in ipairs(lines) do
         local row = i - 1
 
-        -- Palette entry: tint the var name and the hex value with the color.
-        local var, hex = line:match('^%s*([%w_]+)%s*=%s*"(#%x%x%x%x%x%x)"')
-        if var and hex then
-            local sw = swatch(hex)
-            local vs = line:find(var, 1, true)
-            if vs then
-                mark(buf, row, vs - 1, vs - 1 + #var, sw)
+        -- A 2-cell solid swatch, in the color, as virtual text right after every
+        -- quoted hex value. The names/hex text themselves keep normal rendering.
+        local from = 1
+        while true do
+            local s, e = line:find('"#%x%x%x%x%x%x"', from)
+            if not s then
+                break
             end
-            local hs = line:find(hex, 1, true)
-            if hs then
-                mark(buf, row, hs - 1, hs - 1 + #hex, sw)
-            end
+            local hex = line:sub(s + 1, e - 1)
+            pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, e, {
+                virt_text = { { " ██", swatch(hex) } },
+                virt_text_pos = "inline",
+            })
+            from = e + 1
         end
 
-        -- set() call: render the group name in its own appearance, tint p.<var>s.
+        -- Render the group name (in set(...)) and any `link = "target"` in that
+        -- group's own appearance.
         local group = line:match('set%(%s*0%s*,%s*"([^"]+)"')
         if group then
             -- Plain (literal) search — do NOT vim.pesc here: with plain=true the
@@ -177,16 +180,14 @@ function M.decorate(buf)
                 local a = resolved_attrs(group, defs, {})
                 mark(buf, row, q, q + #group, a and ephemeral(a))
             end
-            local from = 1
-            while true do
-                local s, e, v = line:find("p%.([%w_]+)", from)
-                if not s then
-                    break
+            local target = line:match('link%s*=%s*"([^"]+)"')
+            if target then
+                local li = line:find("link", 1, true) or 1
+                local tq = line:find('"' .. target .. '"', li, true)
+                if tq then
+                    local a = resolved_attrs(target, defs, {})
+                    mark(buf, row, tq, tq + #target, a and ephemeral(a))
                 end
-                if palette[v] then
-                    mark(buf, row, (s - 1) + 2, (s - 1) + 2 + #v, swatch(palette[v]))
-                end
-                from = e + 1
             end
         end
     end

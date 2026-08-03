@@ -59,7 +59,7 @@ your Tweaker overrides into a new color scheme file!
     colors = {},
 
     -- Render tweaker-baked colorscheme files as a live legend when you open them
-    -- (group names shown in their own highlight, palette swatches, tinted p.vars).
+    -- (group/link names shown in their own highlight, a swatch block after each hex).
     preview = true,
 }
 ```
@@ -194,14 +194,13 @@ option.
 ## Baked-file preview
 
 Open a colorscheme that tweaker baked and it renders as a **live legend**: each
-group name in a `set(0, "Group", …)` call is drawn in that group's own
-appearance (fg/bg/bold/italic — and links resolve to their target's look), the
-palette's hex values are shown as swatches, and the `p.<var>` references are
-tinted with their color. It's parsed from the file's own `p = {…}` and `set()`
-calls, so the preview is accurate even when a different colorscheme is active,
-and it's read-only decoration (it never changes the buffer or your highlights).
-Only files carrying tweaker's generated header are decorated; disable with
-`preview = false`.
+group name in a `set(0, "Group", …)` call — and each `link = "Target"` — is drawn
+in that group's own appearance (fg/bg/bold/italic, with links resolved to their
+target's look), and every hex color gets a 2-cell **swatch block** shown right
+after it. It's parsed from the file's own `p = {…}` and `set()` calls, so the
+preview is accurate even when a different colorscheme is active, and it's
+read-only decoration (it never changes the buffer or your highlights). Only files
+carrying tweaker's generated header are decorated; disable with `preview = false`.
 
 ## Roadmap
 
