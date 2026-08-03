@@ -68,11 +68,15 @@ local function apply(s, lnum, fg_raw, bg_raw)
         overrides.set(group, fg, bg)
         return
     end
-    -- Nothing deliberate. If we're editing the origin side of a linked row and had
-    -- staged an unlink (an override exists), clearing the cells reverts it: drop
-    -- the override and restore the original link.
-    if not desc.editing_target and desc.link and desc.link ~= "" and overrides.has(group) then
-        overrides.clear(group, desc.orig)
+    -- Nothing deliberate. If we're editing the origin side of a group that was
+    -- originally a link/inherited (remembered in its override), clearing the cells
+    -- reverts the tweak: drop the override and restore the original link — even if
+    -- the group was already overridden when the window opened.
+    if not desc.editing_target and overrides.has_base(group) then
+        local base = overrides.clear(group)
+        if base and base.link then
+            desc.link = base.link -- reflect the restored link so the row renders as one
+        end
     end
     -- otherwise leave the group (and any link) untouched
 end
@@ -265,6 +269,28 @@ function M.attach(buf)
         vim.keymap.set("n", k, "<Nop>", { buffer = buf, nowait = true, silent = true })
     end
     vim.keymap.set("i", "<CR>", "<Esc>", { buffer = buf, nowait = true, silent = true })
+
+    -- Backspace must stay inside the current field: at a field's start it would
+    -- otherwise join the row into the header (or cross into the previous field),
+    -- corrupting the fixed-width layout. Block it there; elsewhere it deletes
+    -- normally and live() re-pads. <C-h> often maps to backspace too.
+    local function guarded_bs()
+        local col = vim.api.nvim_win_get_cursor(0)[2]
+        local s = ui.get_session(buf)
+        local field = (s and s.field) or (col < W and 1 or 2)
+        local fstart = (field == 1) and 0 or W
+        if col <= fstart then
+            return ""
+        end
+        return vim.keycode("<BS>")
+    end
+    for _, k in ipairs({ "<BS>", "<C-h>" }) do
+        vim.keymap.set("i", k, guarded_bs, { buffer = buf, expr = true, nowait = true, silent = true })
+    end
+    -- Line/word kills can delete across field/line boundaries; disable them.
+    for _, k in ipairs({ "<C-u>", "<C-w>" }) do
+        vim.keymap.set("i", k, "<Nop>", { buffer = buf, nowait = true, silent = true })
+    end
 
     vim.api.nvim_create_autocmd("InsertEnter", {
         group = grp,

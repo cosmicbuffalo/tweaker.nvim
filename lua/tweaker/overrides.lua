@@ -66,34 +66,65 @@ function M.apply()
 end
 
 --- Record an override for `group` (fg/bg are "#rrggbb" or nil) and apply it live.
+--- The first time a group is overridden we remember how to relink it later
+--- (`base`): its explicit link, or that it was empty (falls back through a
+--- treesitter @-hierarchy). Captured before applying, while the group still has
+--- its original definition, and persisted so it survives restarts.
 function M.set(group, fg, bg)
     local s = scheme()
     local d = data()
     d[s] = d[s] or {}
-    d[s][group] = { fg = fg, bg = bg }
+    local existing = d[s][group]
+    local base
+    if existing then
+        base = existing.base
+    else
+        local raw = vim.api.nvim_get_hl(0, { name = group })
+        if type(raw) == "table" and raw.link then
+            base = { link = raw.link }
+        elseif type(raw) == "table" and vim.tbl_isempty(raw) then
+            base = { inherit = true }
+        end
+    end
+    d[s][group] = { fg = fg, bg = bg, base = base }
     apply_group(group, d[s][group])
 end
 
---- Whether an override is currently recorded for `group` (current colorscheme).
+--- Whether an override is recorded for `group` (current colorscheme).
 function M.has(group)
     local d = data()[scheme()]
     return d ~= nil and d[group] ~= nil
 end
 
---- Remove `group`'s override and restore its original definition live. `orig` is
---- the group's pre-override own definition (e.g. `{ link = "..." }` for a linked
---- group, or `{}` to fall back to a treesitter @-hierarchy) — passing it back
---- rebuilds the link exactly, so clearing a staged unlink truly relinks.
-function M.clear(group, orig)
+--- Whether `group`'s override remembers an original link/hierarchy to restore.
+function M.has_base(group)
+    local d = data()[scheme()]
+    return d ~= nil and d[group] ~= nil and d[group].base ~= nil
+end
+
+--- Remove `group`'s override and restore its original definition live: an
+--- explicit link relinks as `{ link = target }`, an inherited group clears to
+--- `{}` so it falls back through the hierarchy again, and a group that had its
+--- own colors is left cleared. Returns the restored `base` (or nil).
+function M.clear(group)
     if not group or group == "" then
         return
     end
     local s = scheme()
     local d = data()
+    local entry = d[s] and d[s][group]
     if d[s] then
         d[s][group] = nil
     end
-    pcall(vim.api.nvim_set_hl, 0, group, orig or {})
+    local base = entry and entry.base
+    local restore = {}
+    if base then
+        if base.link then
+            restore = { link = base.link }
+        end -- base.inherit -> restore = {} (already)
+    end
+    pcall(vim.api.nvim_set_hl, 0, group, restore)
+    return base
 end
 
 --- Persist to disk if auto-save is on (called after committed edits).
