@@ -232,6 +232,17 @@ carrying its highlight group and draw priority. Priorities follow Neovim's
 ladder (`vim.hl.priorities`, or `vim.highlight.priorities` on 0.10): syntax `50`,
 treesitter `100`, semantic tokens `125`, up to user extmarks `200`.
 
+## Development
+
+```sh
+make test     # run the test suite (plenary)
+make format   # format with stylua
+make lint     # lint with selene
+make check    # all of the above
+```
+
+CI runs the same checks on pushes and PRs (Neovim stable + nightly).
+
 ## License
 
 [MIT](LICENSE)

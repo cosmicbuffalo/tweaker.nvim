@@ -17,6 +17,25 @@ on:
       - "doc/**"
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        nvim-version: ["stable", "nightly"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.nvim-version }}
+
+      - name: Run tests
+        run: |
+          nvim --version
+          make test
+
   format:
     runs-on: ubuntu-latest
     steps:
@@ -27,7 +46,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
-          args: --check lua/ plugin/
+          args: --check lua/ plugin/ tests/
 
   lint:
     runs-on: ubuntu-latest
@@ -39,4 +58,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
-          args: --display-style=quiet lua/ plugin/
+          args: --display-style=quiet lua/ plugin/ tests/
