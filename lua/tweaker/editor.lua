@@ -64,10 +64,17 @@ local function apply(s, lnum, fg_raw, bg_raw)
     end
     local fg, fg_set = cell(fg_raw, own_fg)
     local bg, bg_set = cell(bg_raw, own_bg)
-    if not (fg_set or bg_set) then
-        return -- nothing deliberate; leave the group (and any link) untouched
+    if fg_set or bg_set then
+        overrides.set(group, fg, bg)
+        return
     end
-    overrides.set(group, fg, bg)
+    -- Nothing deliberate. If we're editing the origin side of a linked row and had
+    -- staged an unlink (an override exists), clearing the cells reverts it: drop
+    -- the override and restore the original link.
+    if not desc.editing_target and desc.link and desc.link ~= "" and overrides.has(group) then
+        overrides.clear(group, desc.orig)
+    end
+    -- otherwise leave the group (and any link) untouched
 end
 
 --- Common context for a change on the current line, or nil if it should be

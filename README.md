@@ -106,9 +106,11 @@ capture colored through the `@`-hierarchy (e.g. `@string.lua` resolving to
 `String`) — is shown as `group → target` with blank FG/BG cells (its colors come
 from the target). You can change it two ways:
 
-- **Unlink it:** type a color into an FG/BG cell. The `→ target` annotation is
-  struck through to show the link will be broken when you save; delete what you
-  typed to restore the link. Saving gives the group that color of its own.
+- **Unlink it:** type a color into an FG/BG cell — this immediately gives the
+  group that color of its own, breaking the link **live**. The `→ target`
+  annotation is struck through while a value is set; delete it to drop the tweak
+  and restore the original link. (Like every edit, this applies live via
+  `nvim_set_hl`; `:TweakerSave` / `auto_save` only persist it to disk.)
 - **Edit the target instead:** press `<C-t>` to point the row at the linked-to
   group (there's a hint at the bottom of the window). The group name goes gray and
   the target lights up in its real color, and the FG/BG fields fill with the

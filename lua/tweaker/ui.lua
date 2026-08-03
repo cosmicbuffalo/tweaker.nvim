@@ -107,10 +107,20 @@ local function build(items)
             link = it.link
         end
         has_link = has_link or (link ~= nil and link ~= "")
+        -- The row's original definition, so a staged unlink can be reverted: an
+        -- explicit link restores as { link = target }; an inherited (@-hierarchy)
+        -- group restores as {} (empty → falls back through the hierarchy again).
+        local orig
+        if own.link then
+            orig = { link = own.link }
+        elseif link and link ~= "" then
+            orig = {}
+        end
         local r = {
             source = it.source or "",
             group = it.group or "",
             link = link,
+            orig = orig,
             priority = it.priority ~= nil and tostring(it.priority) or "",
             -- Linked groups have no own colors: show blank, editable cells.
             fg = not link and util.hex(own.fg) or nil,
@@ -131,7 +141,7 @@ local function build(items)
     for i, r in ipairs(rows) do
         local lnum = i + 1
         lines[lnum] = padr(r.fg or "", FIELD_W) .. padr(r.bg or "", FIELD_W)
-        descs[lnum] = { source = r.source, group = r.group, link = r.link, priority = r.priority }
+        descs[lnum] = { source = r.source, group = r.group, link = r.link, orig = r.orig, priority = r.priority }
         cells[lnum] = CELLS
     end
 

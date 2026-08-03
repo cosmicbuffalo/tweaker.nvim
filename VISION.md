@@ -112,9 +112,9 @@ editing a colorscheme file and reloading to see the effect.
   shown as `group → target` with **blank** FG/BG cells (its colors belong to the
   target, not itself). There are two ways to change it:
   - **Unlink it:** typing a color into a blank cell gives the group that color
-    directly. While a value is staged, the `→ target` annotation is shown
-    **struck through** to signal the link will be broken on save; clearing the
-    value restores the link.
+    directly, breaking the link **live** (as with every edit). While a value is
+    set, the `→ target` annotation is shown **struck through**; clearing the value
+    drops the override and restores the original link.
   - **Retarget the editor:** a keymap (`<C-t>`, hinted at the bottom of the window,
     and only when a linked row exists) toggles the row between editing the group
     and editing the group it links to. The active side is drawn in its real color

@@ -74,6 +74,28 @@ function M.set(group, fg, bg)
     apply_group(group, d[s][group])
 end
 
+--- Whether an override is currently recorded for `group` (current colorscheme).
+function M.has(group)
+    local d = data()[scheme()]
+    return d ~= nil and d[group] ~= nil
+end
+
+--- Remove `group`'s override and restore its original definition live. `orig` is
+--- the group's pre-override own definition (e.g. `{ link = "..." }` for a linked
+--- group, or `{}` to fall back to a treesitter @-hierarchy) — passing it back
+--- rebuilds the link exactly, so clearing a staged unlink truly relinks.
+function M.clear(group, orig)
+    if not group or group == "" then
+        return
+    end
+    local s = scheme()
+    local d = data()
+    if d[s] then
+        d[s][group] = nil
+    end
+    pcall(vim.api.nvim_set_hl, 0, group, orig or {})
+end
+
 --- Persist to disk if auto-save is on (called after committed edits).
 function M.autosave()
     if state.auto_save then
