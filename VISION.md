@@ -145,7 +145,14 @@ so the actual rendered colorscheme updates as you type.
 
 `:TweakerBake` turns the current appearance (base colorscheme + applied tweaks)
 into a **standalone** `colors/<name>.lua` — a real, shareable colorscheme that
-needs neither tweaker nor the base scheme installed.
+needs neither tweaker nor the base scheme installed — and **switches to it**.
+
+- After baking you are moved onto the baked colorscheme. Baking again while on a
+  tweaker-baked scheme **re-bakes it in place** (folding in your newest tweaks),
+  rather than chaining a `<name>-tweaked-tweaked`. On any other colorscheme it
+  writes a fresh `<active>-tweaked`.
+- Baking never disturbs your overrides — it only reads the live highlights, so
+  the override layer, toggle, and save/load keep working exactly as before.
 
 - Every unique color is hoisted into a **named palette variable** referenced by
   the highlight calls, so no hex literal appears more than once and the palette

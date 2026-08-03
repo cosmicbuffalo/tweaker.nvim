@@ -90,7 +90,7 @@ vim.api.nvim_set_hl(0, "TweakerBorder", { fg = "#e6c200", bg = "#101010" })
 | `:TweakerSave`      | Persist the current overrides to disk.                               |
 | `:TweakerLoad`      | Discard unsaved tweaks and reload the persisted overrides from disk. |
 | `:TweakerOpenOverrides` | Open the overrides JSON file in the current window.             |
-| `:TweakerBake[!] [name]` | Export the current highlights + your tweaks to a standalone colorscheme `colors/<name>.lua` (bang to overwrite). |
+| `:TweakerBake[!] [name]` | Bake the current highlights + your tweaks into a standalone colorscheme `colors/<name>.lua` and switch to it. On a scheme you already baked, re-bakes it in place; otherwise writes `<active>-tweaked` (bang to overwrite a different existing file). |
 
 Table columns: `SOURCE · GROUP · FG · BG · PRIORITY`. **FG and BG are editable**
 (PRIORITY is read-only for now). Navigate between the FG/BG cells with normal Vim
@@ -122,9 +122,20 @@ colorscheme on startup and whenever the colorscheme changes.
 ## Export
 
 `:TweakerBake[!] [name]` writes a **standalone** colorscheme to
-`stdpath("config")/colors/<name>.lua` (default name `<current>-tweaked`), snapshotting
-every highlight group in the current session — base colorscheme + your applied
-tweaks — so it loads with no dependency on tweaker or the base scheme.
+`stdpath("config")/colors/<name>.lua`, snapshotting every highlight group in the
+current session — base colorscheme + your applied tweaks — so it loads with no
+dependency on tweaker or the base scheme, then **switches to it**.
+
+The name is chosen for you:
+
+- On a colorscheme you previously baked, `:TweakerBake` **re-bakes it in place** —
+  your latest tweaks are folded back into the same file and you stay on it (no
+  `<name>-tweaked-tweaked` chaining). Updating the scheme you're on doesn't need
+  the bang.
+- Otherwise it writes `<active colorscheme>-tweaked` (or pass an explicit `name`).
+  Overwriting a *different* existing file requires the bang (`:TweakerBake! name`).
+
+Your overrides are untouched by baking — it only reads the live highlights.
 
 Every unique color is hoisted into a named **palette variable** referenced by the
 `set` calls, so no hex appears twice:
@@ -155,8 +166,6 @@ palette is laid out as a **gradient**: grouped by name, the groups ordered
 around the spectrum, and the shades within each name numbered `_1`, `_2`, … from
 darkest to lightest. The anchor colors are fully overridable via the `colors`
 option.
-
-It refuses to overwrite an existing file unless you use the bang (`:TweakerBake! name`).
 
 ## Roadmap
 
