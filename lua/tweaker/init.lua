@@ -4,9 +4,11 @@ local M = {}
 ---@field auto_save boolean  persist overrides to disk on every committed edit
 ---@field path string|nil    override file location
 ---@field colors table|nil   extra/override master colors ({ name = "#hex" }) for export naming
+---@field preview boolean|nil render baked colorscheme files as a live legend (default true)
 local defaults = {
     auto_save = false,
     colors = {},
+    preview = true,
 }
 
 M.config = vim.deepcopy(defaults)
@@ -49,6 +51,7 @@ function M.setup(opts)
     M.config = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
     require("tweaker.overrides").setup(M.config)
     require("tweaker.palette").setup(M.config.colors)
+    require("tweaker.preview").setup(M.config.preview)
 
     local cmd = vim.api.nvim_create_user_command
 

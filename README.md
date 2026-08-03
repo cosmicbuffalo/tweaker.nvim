@@ -57,6 +57,10 @@ your Tweaker overrides into a new color scheme file!
     -- Extra/override anchor colors ({ name = "#hex" }) used to name palette
     -- variables in :TweakerBake. Merged over the built-in anchors.
     colors = {},
+
+    -- Render tweaker-baked colorscheme files as a live legend when you open them
+    -- (group names shown in their own highlight, palette swatches, tinted p.vars).
+    preview = true,
 }
 ```
 
@@ -187,12 +191,25 @@ around the spectrum, and the shades within each name numbered `_1`, `_2`, … fr
 darkest to lightest. The anchor colors are fully overridable via the `colors`
 option.
 
+## Baked-file preview
+
+Open a colorscheme that tweaker baked and it renders as a **live legend**: each
+group name in a `set(0, "Group", …)` call is drawn in that group's own
+appearance (fg/bg/bold/italic — and links resolve to their target's look), the
+palette's hex values are shown as swatches, and the `p.<var>` references are
+tinted with their color. It's parsed from the file's own `p = {…}` and `set()`
+calls, so the preview is accurate even when a different colorscheme is active,
+and it's read-only decoration (it never changes the buffer or your highlights).
+Only files carrying tweaker's generated header are decorated; disable with
+`preview = false`.
+
 ## Roadmap
 
 - [x] `:Tweaker [group…]` — editable table with live fg/bg preview
 - [x] Persist overrides across restarts (reapply on `ColorScheme`/startup)
 - [x] Toggle overrides on/off; save/load
 - [x] Export overrides to a standalone colorscheme (named palette variables)
+- [x] Preview baked colorscheme files as a live legend
 - [ ] Editable priority
 
 ## How it works

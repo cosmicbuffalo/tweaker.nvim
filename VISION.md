@@ -181,6 +181,15 @@ needs neither tweaker nor the base scheme installed — and **switches to it**.
   the hue families), and the shades within each name run darkest→lightest — so
   the numbering follows a smooth visual progression.
 
+## Baked-file preview
+
+Opening a colorscheme that tweaker baked turns it into a **live legend**: each
+group name in a `set()` call is rendered in that group's own appearance (colors,
+bold/italic, and links resolved to their target), palette hex values show as
+swatches, and `p.<var>` references are tinted. It is parsed from the file's own
+palette and `set()` calls — not the active colorscheme — so it faithfully shows
+what *that file* defines, and it is purely read-only decoration.
+
 ## Guiding principles
 
 - **In-context editing.** Always tie changes back to real, visible text.
