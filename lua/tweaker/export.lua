@@ -24,49 +24,37 @@ local ATTRS = {
     "blend",
 }
 
---- Sort key for grouping palette variables by color name: (core family,
---- variant rank dark<base<light, hex-order index). Keeps all shades of a color
---- together and its dark_/base/light_ variants adjacent.
----@param v string  variable name like "dark_blue_2"
----@return string core, integer variant, integer index
-local function name_key(v)
-    local base, idx = v:match("^(.-)_(%d+)$")
-    base = base or v
-    idx = tonumber(idx) or 0
-    local d = base:match("^dark_(.+)$")
-    local l = base:match("^light_(.+)$")
-    if d then
-        return d, 0, idx
-    elseif l then
-        return l, 2, idx
-    end
-    return base, 1, idx
-end
-
---- hex -> variable name. Hexes are grouped by nearest master color, and the
---- shades within each name are numbered (_1, _2, ...) by perceptual lightness
---- (dark -> light) so they read as a clean gradient.
----@return table map, string[] hexes
+--- hex -> variable name, plus the hexes in final palette order. Hexes are
+--- grouped by nearest color name; the groups are ordered into a gradient by
+--- name_rank; and the shades within each name are numbered (_1, _2, ...) by
+--- perceptual lightness (dark -> light).
+---@return table map, string[] ordered
 local function build_vars(used)
     local hexes = vim.tbl_keys(used)
-    -- Group hexes by their nearest master color name.
+    -- Group hexes by their nearest color name.
     local by_name = {}
     for _, hex in ipairs(hexes) do
-        local base = palette.nearest(hex)
-        by_name[base] = by_name[base] or {}
-        table.insert(by_name[base], hex)
+        local name = palette.nearest(hex)
+        by_name[name] = by_name[name] or {}
+        table.insert(by_name[name], hex)
     end
-    -- Within each name, order by lightness and number _1 (darkest) upward.
-    local map = {}
-    for base, list in pairs(by_name) do
+    -- Emit names in gradient order; within each name, order by lightness.
+    local names = vim.tbl_keys(by_name)
+    table.sort(names, function(a, b)
+        return palette.name_rank(a) < palette.name_rank(b)
+    end)
+    local map, ordered = {}, {}
+    for _, name in ipairs(names) do
+        local list = by_name[name]
         table.sort(list, function(a, b)
             return palette.lightness(a) < palette.lightness(b)
         end)
         for i, hex in ipairs(list) do
-            map[hex] = base .. "_" .. i
+            map[hex] = name .. "_" .. i
+            ordered[#ordered + 1] = hex
         end
     end
-    return map, hexes
+    return map, ordered
 end
 
 --- Build the colorscheme source text.
@@ -87,7 +75,7 @@ function M.generate(name)
         names[#names + 1] = gname
     end
     table.sort(names)
-    local var, sorted_hexes = build_vars(used)
+    local var, ordered = build_vars(used)
 
     local out = {}
     local function add(line)
@@ -100,27 +88,14 @@ function M.generate(name)
     add(string.format("vim.o.background = %q", vim.o.background))
     add("")
 
-    -- Palette table, grouped by color name for readability: all shades of a
-    -- color sit together (its dark_/base/light_ variants kept adjacent), and
-    -- within a name the hex-order index (_1, _2, ...) is preserved.
+    -- Palette table, laid out as a gradient (grouped by color name, groups in
+    -- spectral order, shades dark -> light), aligned for readability.
     add("local p = {")
     local w = 0
-    for _, hex in ipairs(sorted_hexes) do
+    for _, hex in ipairs(ordered) do
         w = math.max(w, #var[hex])
     end
-    local print_order = vim.deepcopy(sorted_hexes)
-    table.sort(print_order, function(a, b)
-        local ca, va, ia = name_key(var[a])
-        local cb, vb, ib = name_key(var[b])
-        if ca ~= cb then
-            return ca < cb
-        end
-        if va ~= vb then
-            return va < vb
-        end
-        return ia < ib
-    end)
-    for _, hex in ipairs(print_order) do
+    for _, hex in ipairs(ordered) do
         add(string.format("  %-" .. w .. 's = "%s",', var[hex], hex))
     end
     add("}")

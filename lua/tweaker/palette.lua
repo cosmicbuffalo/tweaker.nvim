@@ -1,45 +1,36 @@
---- Maps arbitrary hex colors to human-readable base names by nearest match
---- against a master list of named colors. Used by the exporter to name palette
---- variables (red_1, red_2, light_blue_1, ...).
+--- Maps arbitrary hex colors to human-readable names by matching them in a
+--- perceptual color space (OKLCh), and provides the ordering used to lay the
+--- baked palette out as a smooth gradient. Used by the exporter to name and
+--- order palette variables (red_1, red_2, light_blue_1, ...).
 local M = {}
 
--- Master colors: { name, "#hex" }, kept sorted by hex value. Each core color
--- (red/green/blue/orange/pink/purple/yellow/brown/gray) has dark_/light_
--- variants, plus black and white. Users can extend/override via setup().
+-- Chromatic hue anchors: { name, representative "#hex" }. The name is chosen by
+-- the nearest anchor *hue* in OKLab; lightness then picks the dark_/light_
+-- variant and neutrals (grays) are split off by low chroma. Anchor hexes are
+-- picked to sit at perceptually central hues/lightnesses for their name (sRGB
+-- primaries like #0000ff are poor anchors: pure blue reads as violet in OKLab).
+-- Users can add/override anchors via setup() (e.g. { teal = "#008080" }).
 local DEFAULT = {
-    { "black", "#000000" },
-    { "dark_green", "#006400" },
-    { "green", "#008000" },
-    { "dark_cyan", "#008b8b" },
-    { "blue", "#0000ff" },
-    { "cyan", "#00ffff" },
-    { "dark_blue", "#1f3a5f" },
-    { "dark_gray", "#404040" },
-    { "dark_purple", "#4b0082" },
-    { "dark_brown", "#5c4033" },
-    { "purple", "#800080" },
-    { "gray", "#808080" },
-    { "dark_red", "#8b0000" },
-    { "light_green", "#90ee90" },
-    { "brown", "#a52a2a" },
-    { "light_blue", "#add8e6" },
-    { "dark_yellow", "#b8860b" },
-    { "light_brown", "#c19a6b" },
-    { "dark_pink", "#c71585" },
-    { "light_gray", "#d3d3d3" },
-    { "light_purple", "#d8bfd8" },
-    { "light_cyan", "#e0ffff" },
     { "red", "#ff0000" },
-    { "dark_orange", "#ff8c00" },
-    { "light_red", "#ff9999" },
     { "orange", "#ffa500" },
-    { "pink", "#ffc0cb" },
-    { "light_orange", "#ffcc80" },
-    { "light_pink", "#ffddee" },
-    { "yellow", "#ffff00" },
-    { "light_yellow", "#ffffe0" },
-    { "white", "#ffffff" },
+    { "yellow", "#ffd000" },
+    { "green", "#22a022" },
+    { "cyan", "#14b3b3" },
+    { "blue", "#1e90ff" },
+    { "purple", "#8a2be2" },
+    { "pink", "#ff44aa" },
 }
+
+-- Neutral (gray) names from darkest to lightest, with the upper OKLab-lightness
+-- bound of each. A color counts as neutral when its chroma is below
+-- NEUTRAL_CHROMA; then its lightness picks the name.
+local NEUTRALS = { "black", "dark_gray", "gray", "light_gray", "white" }
+local NEUTRAL_L = { black = 0.15, dark_gray = 0.40, gray = 0.65, light_gray = 0.90, white = 1.01 }
+local NEUTRAL_CHROMA = 0.045
+
+-- How far a color's lightness must differ from its anchor's to earn a
+-- dark_/light_ prefix (OKLab L units).
+local VAR_MARGIN = 0.13
 
 --- Numeric value of a "#rrggbb" string, for sorting.
 function M.val(hex)
@@ -51,9 +42,9 @@ local function channels(hex)
     return math.floor(n / 65536) % 256, math.floor(n / 256) % 256, n % 256
 end
 
--- sRGB (0..255) -> OKLab, a perceptual space where hue is separated from
--- lightness, so nearest-color naming matches human perception (unlike RGB, where
--- gray acts as a magnet for any desaturated-ish color).
+-- sRGB (0..255) -> OKLab, a perceptual space where hue, chroma, and lightness
+-- are separated, so nearest-color naming and gradient ordering match human
+-- perception (unlike RGB, where gray acts as a magnet for desaturated colors).
 local function srgb_to_linear(c)
     c = c / 255
     if c <= 0.04045 then
@@ -62,17 +53,27 @@ local function srgb_to_linear(c)
     return ((c + 0.055) / 1.055) ^ 2.4
 end
 
+--- OKLab L, a, b for a "#rrggbb" hex.
 local function oklab(hex)
     local ri, gi, bi = channels(hex)
     local r, g, b = srgb_to_linear(ri), srgb_to_linear(gi), srgb_to_linear(bi)
     local l = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ^ (1 / 3)
     local m = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ^ (1 / 3)
     local s = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ^ (1 / 3)
-    return {
-        L = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
-        a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
-        b = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
-    }
+    return 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+        1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+        0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s
+end
+
+--- OKLCh: lightness (0..1), chroma, hue (degrees 0..360) for a "#rrggbb" hex.
+local function oklch(hex)
+    local L, a, b = oklab(hex)
+    local C = math.sqrt(a * a + b * b)
+    local h = math.deg(math.atan2(b, a))
+    if h < 0 then
+        h = h + 360
+    end
+    return L, C, h
 end
 
 --- Perceptual lightness (OKLab L, ~0..1) of a "#rrggbb" hex. Used to order the
@@ -80,24 +81,17 @@ end
 ---@param hex string
 ---@return number
 function M.lightness(hex)
-    return oklab(hex).L
+    return (oklab(hex))
 end
 
--- Master colors grouped for naming: neutrals (by lightness) and chromatic
--- families (base name without dark_/light_), each with a representative hue.
-local neutrals = nil -- { {name, L}, ... }
-local families = nil -- { [family] = { hue = <rad>, members = { {name, L}, ... } } }
+-- Built from the anchors in setup(): per-anchor hue/lightness, and the anchor
+-- order around the hue wheel (for gradient layout).
+local anchors = nil -- { { name, hue, L }, ... } sorted by hue
+local anchor_by_name = nil -- { [name] = { hue, L } }
+local family_order = nil -- { [family] = index } chromatic families in hue order
 
--- A color counts as "neutral" (gray/black/white family) when its OKLab chroma is
--- below this; otherwise it's chromatic and named by hue.
-local CHROMA_THRESHOLD = 0.03
-
-local function chroma(lab)
-    return math.sqrt(lab.a * lab.a + lab.b * lab.b)
-end
-
---- Configure the master color list. `custom` is a { name = "#hex" } map merged
---- over the defaults.
+--- Configure the anchor list. `custom` is a { name = "#hex" } map merged over the
+--- built-in anchors.
 function M.setup(custom)
     local map = {}
     for _, c in ipairs(DEFAULT) do
@@ -107,83 +101,105 @@ function M.setup(custom)
         map[name] = hex
     end
 
-    neutrals, families = {}, {}
+    anchors, anchor_by_name = {}, {}
     for name, hex in pairs(map) do
-        local lab = oklab(hex)
-        if chroma(lab) < CHROMA_THRESHOLD then
-            neutrals[#neutrals + 1] = { name = name, L = lab.L }
-        else
-            local family = name:gsub("^dark_", ""):gsub("^light_", "")
-            local fam = families[family]
-            if not fam then
-                fam = { members = {}, sin = 0, cos = 0, base = nil }
-                families[family] = fam
-            end
-            local hue = math.atan2(lab.b, lab.a)
-            fam.members[#fam.members + 1] = { name = name, L = lab.L }
-            fam.sin = fam.sin + math.sin(hue)
-            fam.cos = fam.cos + math.cos(hue)
-            if name == family then
-                fam.base = hue
-            end
-        end
+        local L, _, h = oklch(hex)
+        local a = { name = name, hue = h, L = L }
+        anchors[#anchors + 1] = a
+        anchor_by_name[name] = a
     end
-    -- Representative hue per family: the base variant's hue, else circular average.
-    for _, fam in pairs(families) do
-        fam.hue = fam.base or math.atan2(fam.sin, fam.cos)
-    end
-    table.sort(neutrals, function(a, b)
-        return a.L < b.L
+    table.sort(anchors, function(a, b)
+        return a.hue < b.hue
     end)
+    family_order = {}
+    for i, a in ipairs(anchors) do
+        family_order[a.name] = i
+    end
 end
 
 local function ensure()
-    if not families then
+    if not anchors then
         M.setup()
     end
 end
 
 local function hue_dist(a, b)
     local d = math.abs(a - b)
-    return d > math.pi and (2 * math.pi - d) or d
+    return d > 180 and (360 - d) or d
 end
 
---- Nearest master color name for a "#rrggbb" hex. Low-chroma colors are matched
---- among neutrals by lightness; chromatic colors pick a family by hue, then the
---- dark_/base/light_ variant within it by lightness — so a color is never named a
---- shade that's the wrong brightness.
+--- Nearest human-readable name for a "#rrggbb" hex. Low-chroma colors are named
+--- among the neutrals by lightness; chromatic colors pick a family by hue, then a
+--- dark_/base/light_ variant relative to that anchor's own lightness. Dark
+--- oranges are named brown.
 ---@param hex string
 ---@return string name
 function M.nearest(hex)
     ensure()
-    local t = oklab(hex)
-    if chroma(t) < CHROMA_THRESHOLD then
-        local best, best_d
-        for _, n in ipairs(neutrals) do
-            local d = math.abs(t.L - n.L)
-            if not best_d or d < best_d then
-                best_d, best = d, n.name
+    local L, C, h = oklch(hex)
+
+    if C < NEUTRAL_CHROMA then
+        for _, name in ipairs(NEUTRALS) do
+            if L < NEUTRAL_L[name] then
+                return name
             end
         end
-        return best
+        return "white"
     end
 
-    local th = math.atan2(t.b, t.a)
-    local fam, fam_d
-    for _, f in pairs(families) do
-        local d = hue_dist(th, f.hue)
-        if not fam_d or d < fam_d then
-            fam_d, fam = d, f
+    local fam, fd
+    for _, a in ipairs(anchors) do
+        local d = hue_dist(h, a.hue)
+        if not fd or d < fd then
+            fd, fam = d, a
         end
     end
-    local best, best_d
-    for _, m in ipairs(fam.members) do
-        local d = math.abs(t.L - m.L)
-        if not best_d or d < best_d then
-            best_d, best = d, m.name
-        end
+
+    -- Brown is dark orange (kept off the red hue so dark reds stay dark_red).
+    if fam.name == "orange" and L < 0.50 then
+        return L < 0.30 and "dark_brown" or "brown"
     end
-    return best
+
+    if L < fam.L - VAR_MARGIN then
+        return "dark_" .. fam.name
+    elseif L > fam.L + VAR_MARGIN then
+        return "light_" .. fam.name
+    end
+    return fam.name
+end
+
+-- Ordering ranks so the baked palette reads as a gradient: neutrals first
+-- (black -> white), then chromatic families around the hue wheel, and within a
+-- family the dark_ -> base -> light_ variants.
+local NEUTRAL_RANK = { black = 0, dark_gray = 1, gray = 2, light_gray = 3, white = 4 }
+local VARIANT_RANK = { dark = 0, base = 1, light = 2 }
+
+--- Sort rank for a color *name* (as returned by nearest()). Colors are grouped
+--- by name (all shades of a name share a rank); ranks order the groups into a
+--- gradient. Within a name, order by lightness (see M.lightness).
+---@param name string
+---@return number
+function M.name_rank(name)
+    ensure()
+    if NEUTRAL_RANK[name] then
+        return NEUTRAL_RANK[name]
+    end
+    local variant, core = "base", name
+    local d = name:match("^dark_(.+)$")
+    local l = name:match("^light_(.+)$")
+    if d then
+        variant, core = "dark", d
+    elseif l then
+        variant, core = "light", l
+    end
+    -- Brown slots just after orange in the spectrum.
+    local fo
+    if core == "brown" then
+        fo = (family_order.orange or 0) + 0.5
+    else
+        fo = family_order[core] or 999
+    end
+    return 100 + fo * 3 + VARIANT_RANK[variant]
 end
 
 return M

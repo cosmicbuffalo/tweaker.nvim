@@ -54,8 +54,8 @@ your Tweaker overrides into a new color scheme file!
     -- Where overrides are stored (JSON, keyed per colorscheme).
     path = vim.fn.stdpath("data") .. "/tweaker/overrides.json",
 
-    -- Extra/override master colors ({ name = "#hex" }) used to name palette
-    -- variables in :TweakerBake. Merged over the built-in list.
+    -- Extra/override anchor colors ({ name = "#hex" }) used to name palette
+    -- variables in :TweakerBake. Merged over the built-in anchors.
     colors = {},
 }
 ```
@@ -132,20 +132,27 @@ Every unique color is hoisted into a named **palette variable** referenced by th
 ```lua
 local p = {
   black_1     = "#000000",
-  dark_blue_1 = "#1a3456",
+  gray_1      = "#767676",
+  white_1     = "#ffffff",
+  red_1       = "#ff0000",
   blue_1      = "#0078d4",
+  blue_2      = "#5599dd",
   light_blue_1 = "#00a2ff",
-  -- … grouped by color name …
+  -- … grouped by name, laid out as a gradient …
 }
 local set = vim.api.nvim_set_hl
 set(0, "Normal",  { fg = p.light_blue_1, bg = p.black_1 })
-set(0, "Comment", { fg = p.gray_2, italic = true })
+set(0, "Comment", { fg = p.gray_1, italic = true })
 ```
 
-Variable names come from the nearest match against a master color list (perceptual
-OKLab: hue picks the family, lightness picks the `dark_`/`light_` variant), with
-shades numbered `red_1`, `red_2`, … The master list covers the common colors and is
-fully overridable via the `colors` option.
+Variable names come from the nearest match in a perceptual color space (OKLCh):
+low-chroma colors are named among the neutrals (`black`/`gray`/`white`) by
+lightness, and chromatic colors pick a family by hue (`red`/`blue`/`purple`/…),
+then a `dark_`/`light_` variant relative to that family's own lightness. The
+palette is laid out as a **gradient**: grouped by name, the groups ordered
+around the spectrum, and the shades within each name numbered `_1`, `_2`, … from
+darkest to lightest. The anchor colors are fully overridable via the `colors`
+option.
 
 It refuses to overwrite an existing file unless you use the bang (`:TweakerBake! name`).
 

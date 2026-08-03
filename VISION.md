@@ -150,14 +150,16 @@ needs neither tweaker nor the base scheme installed.
 - Every unique color is hoisted into a **named palette variable** referenced by
   the highlight calls, so no hex literal appears more than once and the palette
   reads like a real, hand-authored theme.
-- Variable names are **human-readable**, derived by matching each color to the
-  nearest entry in a master color list (perceptual: hue chooses the family, e.g.
-  red/blue/cyan/…; lightness chooses the `dark_`/`light_` variant). Multiple
-  shades of a family are numbered `red_1`, `red_2`, … The master list covers the
-  common colors (with dark/light variants, black, white) and is user-configurable.
-- The palette is **grouped by color name** — all shades of a color sit together,
-  with its `dark_`/base/`light_` variants adjacent — for readable output; the
-  master list is kept sorted by hex.
+- Variable names are **human-readable**, derived by matching each color in a
+  perceptual color space (OKLCh): low-chroma colors are named among the neutrals
+  (black/gray/white) by lightness, and chromatic colors pick a family by hue
+  (red/blue/purple/…), then a `dark_`/`light_` variant relative to that family's
+  lightness. Multiple shades of a name are numbered `red_1`, `red_2`, … The anchor
+  colors are user-configurable.
+- The palette is laid out as an **eye-pleasing gradient**: variables are grouped
+  by name, the groups are ordered around the spectrum (neutrals dark→light, then
+  the hue families), and the shades within each name run darkest→lightest — so
+  the numbering follows a smooth visual progression.
 
 ## Guiding principles
 
