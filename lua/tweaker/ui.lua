@@ -482,7 +482,7 @@ end
 ---   * clamping pulls it onto/over the cursor -> connector drops straight down
 ---     into the TOP border at the cursor's column (`┴`, or `├`/`┤` at a corner).
 --- Junctions are always drawn as a 1x1 overlay, so the border stays plain.
-local function compute_placement(src, width, height)
+local function compute_placement(src, width)
     local fallback = {
         case = "none",
         cfg = {
@@ -640,7 +640,7 @@ function M.open(title, items, opts)
 
     local height = math.min(#layout.lines, vim.o.lines - 4)
     local width = math.min(layout.width + 1, vim.o.columns - 4)
-    local placement = compute_placement(opts.source, width, height)
+    local placement = compute_placement(opts.source, width)
     local cfg = vim.tbl_extend("force", placement.cfg, {
         width = width,
         height = height,

@@ -174,16 +174,16 @@ local function encode_pretty(all)
         return "{}\n"
     end
     local out = { "{" }
-    for si, scheme in ipairs(schemes) do
+    for si, sname in ipairs(schemes) do
         local groups = {}
-        for g in pairs(all[scheme]) do
+        for g in pairs(all[sname]) do
             groups[#groups + 1] = g
         end
         table.sort(groups)
-        out[#out + 1] = "  " .. vim.json.encode(scheme) .. ": {"
+        out[#out + 1] = "  " .. vim.json.encode(sname) .. ": {"
         for gi, g in ipairs(groups) do
             local sep = gi < #groups and "," or ""
-            out[#out + 1] = "    " .. vim.json.encode(g) .. ": " .. encode_entry(all[scheme][g]) .. sep
+            out[#out + 1] = "    " .. vim.json.encode(g) .. ": " .. encode_entry(all[sname][g]) .. sep
         end
         out[#out + 1] = "  }" .. (si < #schemes and "," or "")
     end
