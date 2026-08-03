@@ -64,6 +64,27 @@ local function swatch(hex)
     return ephemeral({ fg = hex })
 end
 
+--- Readable text color (white or black) to sit on `hex` as a background.
+local function contrast(hex)
+    local n = tonumber(hex:sub(2), 16) or 0
+    local r, g, b = math.floor(n / 65536) % 256, math.floor(n / 256) % 256, n % 256
+    -- Perceptual (YIQ) luminance: light backgrounds get black text, dark get white.
+    return (r * 299 + g * 587 + b * 114) / 1000 >= 128 and "#000000" or "#ffffff"
+end
+
+--- Virtual-text swatch shown after a color: a solid block, "Xx" in the color as
+--- foreground, and "Xx" with the color as background (contrasting text).
+local function swatch_virt(hex)
+    return {
+        { " " },
+        { "██", swatch(hex) },
+        { " " },
+        { "Xx", swatch(hex) },
+        { " " },
+        { "Xx", ephemeral({ bg = hex, fg = contrast(hex) }) },
+    }
+end
+
 --- Is this buffer a tweaker-generated colorscheme?
 local function is_baked(buf)
     local first = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ""
@@ -162,7 +183,7 @@ function M.decorate(buf)
             end
             local hex = line:sub(s + 1, e - 1)
             pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, e, {
-                virt_text = { { " ██", swatch(hex) } },
+                virt_text = swatch_virt(hex),
                 virt_text_pos = "inline",
             })
             from = e + 1
@@ -177,7 +198,7 @@ function M.decorate(buf)
             end
             if palette[v] then
                 pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, e, {
-                    virt_text = { { " ██", swatch(palette[v]) } },
+                    virt_text = swatch_virt(palette[v]),
                     virt_text_pos = "inline",
                 })
             end
