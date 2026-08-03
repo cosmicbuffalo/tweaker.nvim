@@ -263,9 +263,9 @@ function M.attach(buf)
         bump(buf, -1)
     end, { buffer = buf, nowait = true, silent = true, desc = "Tweaker: decrement RGB component under cursor" })
 
-    -- Never add rows: block the line-creating commands. <CR> in insert leaves
-    -- insert instead of splitting the line.
-    for _, k in ipairs({ "o", "O" }) do
+    -- Never add or merge rows: block the line-creating/joining commands. <CR> in
+    -- insert leaves insert instead of splitting the line.
+    for _, k in ipairs({ "o", "O", "J", "gJ" }) do
         vim.keymap.set("n", k, "<Nop>", { buffer = buf, nowait = true, silent = true })
     end
     vim.keymap.set("i", "<CR>", "<Esc>", { buffer = buf, nowait = true, silent = true })

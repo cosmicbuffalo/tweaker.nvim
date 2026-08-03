@@ -303,29 +303,34 @@ local function confine(buf)
     if vim.api.nvim_win_get_buf(win) ~= buf then
         return
     end
+    local total = vim.api.nvim_buf_line_count(buf)
     local pos = vim.api.nvim_win_get_cursor(win)
 
     if s.field and vim.api.nvim_get_mode().mode:sub(1, 1) == "i" then
-        -- Insert mode: keep the cursor inside the field being edited.
+        -- Insert mode: keep the cursor inside the field being edited. Clamp the
+        -- line to what the buffer actually has, so a transient bad state can't
+        -- throw "out of range" (and never move to a nonexistent line).
         local fstart = (s.field == 1) and FG_S or BG_S
-        local lnum = s.active_lnum or pos[1]
-        local col = math.max(fstart, math.min(pos[2], fstart + FIELD_W - 1))
+        local lnum = math.max(1, math.min(s.active_lnum or pos[1], total))
+        local line = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
+        local col = math.max(fstart, math.min(pos[2], fstart + FIELD_W - 1, #line))
         if pos[1] ~= lnum or pos[2] ~= col then
-            vim.api.nvim_win_set_cursor(win, { lnum, col })
+            pcall(vim.api.nvim_win_set_cursor, win, { lnum, col })
         end
         return
     end
 
-    local lnum = math.max(s.first, math.min(pos[1], s.last))
+    local lnum = math.max(s.first, math.min(pos[1], s.last, total))
     local ranges = s.cells[lnum]
     if not ranges then
         return
     end
+    local line = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
     local min_c = ranges[1][1]
-    local max_c = ranges[#ranges][2] - 1
+    local max_c = math.min(ranges[#ranges][2] - 1, #line)
     local col = math.max(min_c, math.min(pos[2], max_c))
     if lnum ~= pos[1] or col ~= pos[2] then
-        vim.api.nvim_win_set_cursor(win, { lnum, col })
+        pcall(vim.api.nvim_win_set_cursor, win, { lnum, col })
     end
 end
 
