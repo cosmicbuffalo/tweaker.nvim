@@ -11,8 +11,10 @@ When you're happy with your color scheme and ready to bake it, run `:TweakerBake
 your Tweaker overrides into a new color scheme file!
 
 > [!NOTE]
-> **Status: early development.** Live editing (`:Tweaker`), persistence, and
-> exporting to a standalone colorscheme (`:TweakerBake`) work today.
+> What works today: live editing (`:Tweaker`), per-colorscheme persistence,
+> editing/relinking linked groups, baking to a standalone colorscheme
+> (`:TweakerBake`), and a live preview of baked files. Editable priority is the
+> main planned addition (see the roadmap).
 
 ## Requirements
 
@@ -228,3 +230,7 @@ captures, LSP semantic tokens, `:syntax` groups, and extmarks — each already
 carrying its highlight group and draw priority. Priorities follow Neovim's
 ladder (`vim.hl.priorities`): syntax `50`, treesitter `100`, semantic tokens
 `125`, up to user extmarks `200`.
+
+## License
+
+[MIT](LICENSE)
