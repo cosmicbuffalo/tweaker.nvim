@@ -280,6 +280,60 @@ function M.rerender(buf)
     end
 end
 
+--- The fixed-width real text (fg + bg fields) a row should have, derived from the
+--- live highlight state (edits apply live, so this is the source of truth). Linked
+--- rows are blank; a row toggled to its target shows the target's own colors.
+local function row_content(desc)
+    local fg, bg = "", ""
+    local group
+    if desc.editing_target and desc.link and desc.link ~= "" then
+        group = desc.link
+    elseif desc.link and desc.link ~= "" then
+        group = nil -- shown as a link: blank cells
+    else
+        group = desc.group
+    end
+    if group then
+        local own = util.resolve(group)
+        if not own.link then
+            fg = util.hex(own.fg) or ""
+            bg = util.hex(own.bg) or ""
+        end
+    end
+    return padr(fg, FIELD_W) .. padr(bg, FIELD_W)
+end
+
+--- Public: self-heal the buffer structure. If an edit ever corrupts it — a row
+--- joined into the header (line count shrank) or the header line got text — the
+--- fixed-width layout is unrecoverable from the buffer, so rebuild every line
+--- from the live highlight state and re-render. Returns true if it repaired
+--- something (callers should then skip their normal edit handling). Cheap no-op
+--- when the structure is intact.
+function M.resync(buf)
+    local s = sessions[buf]
+    if not s or not s.has_data or not s.rows then
+        return false
+    end
+    local total = vim.api.nvim_buf_line_count(buf)
+    local header = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ""
+    if total == s.last and header == "" then
+        return false -- structure intact
+    end
+    local lines = { "" } -- header (chrome only)
+    for lnum = s.first, s.last do
+        lines[lnum] = row_content(s.rows[lnum] or {})
+    end
+    s.adjusting = true
+    pcall(vim.api.nvim_buf_set_lines, buf, 0, -1, false, lines)
+    s.adjusting = false
+    M.rerender(buf)
+    local win = vim.api.nvim_get_current_win()
+    if vim.api.nvim_win_get_buf(win) == buf then
+        pcall(vim.api.nvim_win_set_cursor, win, { s.first, FG_S })
+    end
+    return true
+end
+
 -- Leader-line geometry (all in screen cells relative to the cursor).
 local GAP_ROWS = 1 -- rows of vertical connector between the cursor and the window top
 local SIDE_OFF = 3 -- preferred gap: window corner this many cols right of the cursor

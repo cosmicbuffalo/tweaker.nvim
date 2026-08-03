@@ -321,14 +321,18 @@ function M.attach(buf)
         group = grp,
         buffer = buf,
         callback = function()
-            live(buf)
+            if not ui.resync(buf) then
+                live(buf)
+            end
         end,
     })
     vim.api.nvim_create_autocmd("TextChanged", {
         group = grp,
         buffer = buf,
         callback = function()
-            settle(buf)
+            if not ui.resync(buf) then
+                settle(buf)
+            end
         end,
     })
 end
