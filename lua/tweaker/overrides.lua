@@ -102,11 +102,11 @@ function M.has_base(group)
     return d ~= nil and d[group] ~= nil and d[group].base ~= nil
 end
 
---- Remove `group`'s override and restore its original definition live: an
---- explicit link relinks as `{ link = target }`, an inherited group clears to
---- `{}` so it falls back through the hierarchy again, and a group that had its
---- own colors is left cleared. Returns the restored `base` (or nil).
-function M.clear(group)
+--- Remove `group`'s override and restore its original definition live. Restores
+--- to `orig` when given (e.g. the row's open-time definition: `{ link = target }`,
+--- or `{}` to fall back through a treesitter @-hierarchy); otherwise to whatever
+--- the override remembered (`base`); otherwise to empty. Returns the stored base.
+function M.clear(group, orig)
     if not group or group == "" then
         return
     end
@@ -116,15 +116,16 @@ function M.clear(group)
     if d[s] then
         d[s][group] = nil
     end
-    local base = entry and entry.base
-    local restore = {}
-    if base then
-        if base.link then
+    local restore = orig
+    if restore == nil then
+        local base = entry and entry.base
+        restore = {}
+        if base and base.link then
             restore = { link = base.link }
-        end -- base.inherit -> restore = {} (already)
+        end -- base.inherit -> {} (already)
     end
     pcall(vim.api.nvim_set_hl, 0, group, restore)
-    return base
+    return entry and entry.base
 end
 
 --- Persist to disk if auto-save is on (called after committed edits).

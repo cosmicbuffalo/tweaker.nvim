@@ -1,4 +1,5 @@
 local util = require("tweaker.util")
+local overrides = require("tweaker.overrides")
 
 local M = {}
 
@@ -108,10 +109,21 @@ local function build(items)
             link = it.link
         end
         has_link = has_link or (link ~= nil and link ~= "")
+        -- How to restore this row if a tweak is later cleared: an explicit link
+        -- relinks as { link = target }; an inherited (@-hierarchy) row restores as
+        -- {} (empty → falls back through the hierarchy). Captured from the live
+        -- state at open, so it works even independent of the override's own memory.
+        local orig
+        if own.link then
+            orig = { link = own.link }
+        elseif link and link ~= "" then
+            orig = {}
+        end
         local r = {
             source = it.source or "",
             group = it.group or "",
             link = link,
+            orig = orig,
             priority = it.priority ~= nil and tostring(it.priority) or "",
             -- Linked groups have no own colors: show blank, editable cells.
             fg = not link and util.hex(own.fg) or nil,
@@ -132,7 +144,7 @@ local function build(items)
     for i, r in ipairs(rows) do
         local lnum = i + 1
         lines[lnum] = padr(r.fg or "", FIELD_W) .. padr(r.bg or "", FIELD_W)
-        descs[lnum] = { source = r.source, group = r.group, link = r.link, priority = r.priority }
+        descs[lnum] = { source = r.source, group = r.group, link = r.link, orig = r.orig, priority = r.priority }
         cells[lnum] = CELLS
     end
 
@@ -321,7 +333,14 @@ function M.resync(buf)
     end
     local lines = { "" } -- header (chrome only)
     for lnum = s.first, s.last do
-        lines[lnum] = row_content(s.rows[lnum] or {})
+        local desc = s.rows[lnum] or {}
+        -- A row shown as a link must not carry a live override. If it still does,
+        -- the normal restore was skipped (this repair ran instead) — restore the
+        -- link now so the display and the actual highlight agree.
+        if desc.link and desc.link ~= "" and not desc.editing_target and desc.group and overrides.has(desc.group) then
+            overrides.clear(desc.group, desc.orig)
+        end
+        lines[lnum] = row_content(desc)
     end
     s.adjusting = true
     pcall(vim.api.nvim_buf_set_lines, buf, 0, -1, false, lines)

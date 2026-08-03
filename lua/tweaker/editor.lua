@@ -68,14 +68,17 @@ local function apply(s, lnum, fg_raw, bg_raw)
         overrides.set(group, fg, bg)
         return
     end
-    -- Nothing deliberate. If both cells are now empty and this group was
-    -- originally a link/inherited (remembered in its override), clearing them
-    -- reverts the tweak: drop the override and restore the original link — even if
-    -- the group was already overridden when the window opened.
-    if not desc.editing_target and fg_raw == "" and bg_raw == "" and overrides.has_base(group) then
-        local base = overrides.clear(group)
-        if base and base.link then
-            desc.link = base.link -- reflect the restored link so the row renders as one
+    -- Nothing deliberate. If both cells are now empty and this group has a live
+    -- override that we know how to revert (its open-time definition, or the link
+    -- the override remembered), clearing the cells restores the original link.
+    if not desc.editing_target and fg_raw == "" and bg_raw == "" and overrides.has(group) then
+        if desc.orig ~= nil then
+            overrides.clear(group, desc.orig)
+        elseif overrides.has_base(group) then
+            local base = overrides.clear(group)
+            if not desc.link and base and base.link then
+                desc.link = base.link -- reopened concrete row: show it as a link again
+            end
         end
     end
     -- otherwise leave the group (and any link) untouched
@@ -137,8 +140,8 @@ local function live(buf)
     end
     local cur = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
     local _, fg, bg = split(cur, field)
-    ui.rerender(buf)
     apply(s, lnum, fg, bg)
+    ui.rerender(buf) -- after apply so the group swatch reflects the new/restored color
 end
 
 --- Normal-mode change / InsertLeave: normalize the line back to fixed width
@@ -167,8 +170,8 @@ local function settle(buf)
         local col = math.min(math.max(win and vim.api.nvim_win_get_cursor(win)[2] or fstart, fstart), fstart + #val)
         pcall(vim.api.nvim_win_set_cursor, win, { lnum, math.min(col, fstart + W - 1) })
     end
-    ui.rerender(buf)
     apply(s, lnum, fg, bg)
+    ui.rerender(buf) -- after apply so the group swatch reflects the new/restored color
     overrides.autosave()
 end
 
@@ -202,9 +205,9 @@ local function bump(buf, delta)
     s.adjusting = true
     vim.api.nvim_buf_set_lines(buf, lnum - 1, lnum, false, { newline })
     s.adjusting = false
-    ui.rerender(buf)
     local _, fg, bg = split(newline, field)
     apply(s, lnum, fg, bg)
+    ui.rerender(buf) -- after apply so the group swatch reflects the new color
     overrides.autosave()
     pcall(vim.fn.winrestview, view)
 end
