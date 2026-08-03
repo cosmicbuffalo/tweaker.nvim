@@ -101,9 +101,11 @@ you type into it. Color cells keep a fixed width while you edit, so the other
 columns stay aligned. With the cursor over a hex code, `<M-Up>` / `<M-Down>`
 increment / decrement the R/G/B component under the cursor (clamped `00`–`ff`).
 
-A group that only **links** to another is shown as `group → target` with blank
-FG/BG cells (its colors come from the target). Typing a color into one of those
-cells **unlinks** the group and gives it that color directly.
+A group whose color is **inherited** — either an explicit link, or a treesitter
+capture colored through the `@`-hierarchy (e.g. `@string.lua` resolving to
+`String`) — is shown as `group → target` with blank FG/BG cells (its colors come
+from the target). Typing a color into one of those cells **unlinks** the group
+and gives it that color directly.
 
 Inside the float: `q` / `<C-c>` to close.
 

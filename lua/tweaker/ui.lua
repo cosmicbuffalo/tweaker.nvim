@@ -80,15 +80,23 @@ local function build(items)
     local rows = {}
     local sw, gw, pw = #"SOURCE", #"GROUP", #"PRIORITY"
     for _, it in ipairs(items) do
-        local link = it.hl.link -- nil, or the group this one links to
+        local own = it.hl or {}
+        -- A group's own explicit link, or — when it has no definition of its own
+        -- (e.g. a treesitter capture colored via the @-hierarchy) — the resolved
+        -- provider that inspect_pos reported. Either way its color is inherited,
+        -- so show it as a link with blank, editable cells.
+        local link = own.link
+        if not link and vim.tbl_isempty(own) and it.link and it.link ~= "" and it.link ~= it.group then
+            link = it.link
+        end
         local r = {
             source = it.source or "",
             group = it.group or "",
             link = link,
             priority = it.priority ~= nil and tostring(it.priority) or "",
             -- Linked groups have no own colors: show blank, editable cells.
-            fg = not link and util.hex(it.hl.fg) or nil,
-            bg = not link and util.hex(it.hl.bg) or nil,
+            fg = not link and util.hex(own.fg) or nil,
+            bg = not link and util.hex(own.bg) or nil,
         }
         sw = math.max(sw, #r.source)
         gw = math.max(gw, vim.fn.strdisplaywidth(r.group .. (link and (" → " .. link) or "")))

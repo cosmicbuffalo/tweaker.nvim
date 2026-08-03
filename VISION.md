@@ -106,11 +106,13 @@ editing a colorscheme file and reloading to see the effect.
   uses normal Vim motions; the cursor snaps across the virtual (non-editable)
   regions between editable cells.
 - **Editing.** Editable cell contents are changed with normal Vim buffer editing.
-- **Linked groups.** A group that merely links to another (e.g. `@variable.lua`
-  → `@variable`) is shown as `group → target` with **blank** FG/BG cells (its
-  colors belong to the target, not itself). Typing a color into one of those
-  blank cells **unlinks** the group and gives it that color directly, so the link
-  can be broken right from the table.
+- **Linked groups.** A group whose color is inherited rather than its own —
+  either an explicit link (e.g. `@variable.lua` → `@variable`) or a treesitter
+  capture resolved through the `@`-hierarchy (e.g. `@string.lua` → `String`) — is
+  shown as `group → target` with **blank** FG/BG cells (its colors belong to the
+  target, not itself). Typing a color into one of those blank cells **unlinks**
+  the group and gives it that color directly, so the link can be broken right from
+  the table.
 - **Empty cells.** If a group lacks a value (e.g. no background color), the cell
   renders a `-` as **virtual text** — but the cell still has a real, landable
   starting position. The moment the user edits that cell, the `-` placeholder
