@@ -10,6 +10,7 @@
 local M = {}
 
 M.enabled = true
+M.swatches = true -- whether the virtual color swatches are shown
 
 local ns = vim.api.nvim_create_namespace("tweaker.preview")
 
@@ -173,36 +174,37 @@ function M.decorate(buf)
     for i, line in ipairs(lines) do
         local row = i - 1
 
-        -- A 2-cell solid swatch, in the color, as virtual text right after every
-        -- quoted hex value. The names/hex text themselves keep normal rendering.
-        local from = 1
-        while true do
-            local s, e = line:find('"#%x%x%x%x%x%x"', from)
-            if not s then
-                break
-            end
-            local hex = line:sub(s + 1, e - 1)
-            pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, e, {
-                virt_text = swatch_virt(hex),
-                virt_text_pos = "inline",
-            })
-            from = e + 1
-        end
-
-        -- ...and the same swatch after every p.<var> palette reference.
-        from = 1
-        while true do
-            local s, e, v = line:find("p%.([%w_]+)", from)
-            if not s then
-                break
-            end
-            if palette[v] then
+        -- A swatch (block + fg sample + contrasting bg sample) as virtual text
+        -- after every quoted hex value and every p.<var> reference. Toggleable.
+        if M.swatches then
+            local from = 1
+            while true do
+                local s, e = line:find('"#%x%x%x%x%x%x"', from)
+                if not s then
+                    break
+                end
+                local hex = line:sub(s + 1, e - 1)
                 pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, e, {
-                    virt_text = swatch_virt(palette[v]),
+                    virt_text = swatch_virt(hex),
                     virt_text_pos = "inline",
                 })
+                from = e + 1
             end
-            from = e + 1
+
+            from = 1
+            while true do
+                local s, e, v = line:find("p%.([%w_]+)", from)
+                if not s then
+                    break
+                end
+                if palette[v] then
+                    pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, e, {
+                        virt_text = swatch_virt(palette[v]),
+                        virt_text_pos = "inline",
+                    })
+                end
+                from = e + 1
+            end
         end
 
         -- Render the group name (in set(...)) and any `link = "target"` in that
@@ -219,15 +221,41 @@ function M.decorate(buf)
             end
             local target = line:match('link%s*=%s*"([^"]+)"')
             if target then
-                local li = line:find("link", 1, true) or 1
-                local tq = line:find('"' .. target .. '"', li, true)
-                if tq then
-                    local a = resolved_attrs(target, defs, {})
-                    mark(buf, row, tq, tq + #target, a and ephemeral(a))
+                local a = resolved_attrs(target, defs, {})
+                if a then
+                    local li = line:find("link", 1, true) or 1
+                    local tq = line:find('"' .. target .. '"', li, true)
+                    if tq then
+                        mark(buf, row, tq, tq + #target, ephemeral(a))
+                    end
+                elseif not a then
+                    -- The link resolves to a group this colorscheme never defines,
+                    -- so it has no color. Flag it at end of line.
+                    pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, 0, {
+                        virt_text = { { "  -- undefined link target", "DiagnosticWarn" } },
+                        virt_text_pos = "eol",
+                    })
                 end
             end
         end
     end
+end
+
+--- Re-decorate every loaded baked buffer (e.g. after toggling swatches).
+function M.refresh_all()
+    for _, b in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_loaded(b) and is_baked(b) then
+            M.decorate(b)
+        end
+    end
+end
+
+--- Toggle the virtual color swatches on/off across all baked buffers.
+function M.toggle_swatches()
+    M.swatches = not M.swatches
+    M.refresh_all()
+    vim.notify("tweaker: color swatches " .. (M.swatches and "ON" or "OFF"), vim.log.levels.INFO)
+    return M.swatches
 end
 
 --- Attach the preview to a buffer if it's a baked colorscheme (and refresh on

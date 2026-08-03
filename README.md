@@ -95,6 +95,7 @@ vim.api.nvim_set_hl(0, "TweakerBorder", { fg = "#e6c200", bg = "#101010" })
 | `:TweakerLoad`      | Discard unsaved tweaks and reload the persisted overrides from disk. |
 | `:TweakerOpenOverrides` | Open the overrides JSON file in the current window.             |
 | `:TweakerBake[!] [name]` | Bake the current highlights + your tweaks into a standalone colorscheme `colors/<name>.lua` and switch to it. On a scheme you already baked, re-bakes it in place; otherwise writes `<active>-tweaked` (bang to overwrite a different existing file). |
+| `:TweakerToggleSwatches` | Toggle the color swatches in the baked-file preview on/off.          |
 
 Run `:checkhealth tweaker` to verify your setup (Neovim version, `termguicolors`,
 the overrides file). For editing issues, enable a debug log with
@@ -201,8 +202,11 @@ target's look), and a **swatch** is shown after every hex color and every
 `Xx` with the color as background (white/black text chosen for contrast). It's
 parsed from the file's own `p = {…}` and `set()` calls, so the
 preview is accurate even when a different colorscheme is active, and it's
-read-only decoration (it never changes the buffer or your highlights). Only files
-carrying tweaker's generated header are decorated; disable with `preview = false`.
+read-only decoration (it never changes the buffer or your highlights). A
+`link = "Target"` whose target the colorscheme never defines is flagged as an
+undefined link target. Only files carrying tweaker's generated header are
+decorated; toggle the swatches with `:TweakerToggleSwatches`, or disable the
+whole preview with `preview = false`.
 
 ## Roadmap
 

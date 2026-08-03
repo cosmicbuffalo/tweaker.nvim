@@ -79,6 +79,10 @@ function M.setup(opts)
         vim.cmd.edit(vim.fn.fnameescape(require("tweaker.overrides").path()))
     end, { desc = "Open the tweaker overrides file in the current window" })
 
+    cmd("TweakerToggleSwatches", function()
+        require("tweaker.preview").toggle_swatches()
+    end, { desc = "Toggle the color swatches in baked colorscheme previews" })
+
     cmd("TweakerBake", function(o)
         require("tweaker.export").write(o.args ~= "" and o.args or nil, o.bang)
     end, {
