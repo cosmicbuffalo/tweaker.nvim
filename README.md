@@ -104,8 +104,17 @@ increment / decrement the R/G/B component under the cursor (clamped `00`–`ff`)
 A group whose color is **inherited** — either an explicit link, or a treesitter
 capture colored through the `@`-hierarchy (e.g. `@string.lua` resolving to
 `String`) — is shown as `group → target` with blank FG/BG cells (its colors come
-from the target). Typing a color into one of those cells **unlinks** the group
-and gives it that color directly.
+from the target). You can change it two ways:
+
+- **Unlink it:** type a color into an FG/BG cell. The `→ target` annotation is
+  struck through to show the link will be broken when you save; delete what you
+  typed to restore the link. Saving gives the group that color of its own.
+- **Edit the target instead:** press `<C-t>` to point the row at the linked-to
+  group (there's a hint at the bottom of the window). The group name goes gray and
+  the target lights up in its real color, and the FG/BG fields fill with the
+  target's values. Edits now apply **directly to the target** (so every group
+  linking to it updates too). Press `<C-t>` again to switch back. With multiple
+  rows, `<C-t>` only toggles the one under the cursor.
 
 Inside the float: `q` / `<C-c>` to close.
 

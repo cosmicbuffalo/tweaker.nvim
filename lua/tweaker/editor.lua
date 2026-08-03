@@ -25,17 +25,29 @@ local function split(line, field)
     return ui.padr(fg, W) .. ui.padr(bg, W), fg, bg
 end
 
+--- The group a row's edits target: normally the row's own group, or — when the
+--- row has been toggled with <C-t> — the group it links to.
+local function active_group(desc)
+    if desc.editing_target and desc.link and desc.link ~= "" then
+        return desc.link
+    end
+    return desc.group
+end
+
 --- Record the row's fg/bg as an override (which applies it live, breaking any
 --- link). Each cell: "#rrggbb" -> that color; NONE -> cleared; blank/partial ->
 --- keep the group's own value. Only records when a cell holds a *deliberate*
 --- value (a color or NONE), so a linked group isn't unlinked just by opening it
---- or typing a partial value.
+--- or typing a partial value. Edits target the row's active group (its own, or
+--- the linked-to group when toggled), so tweaking a link target changes it
+--- directly rather than unlinking the group under the cursor.
 local function apply(s, lnum, fg_raw, bg_raw)
     local desc = s.rows and s.rows[lnum]
     if not desc or not desc.group or desc.group == "" then
         return
     end
-    local own = util.own(desc.group)
+    local group = active_group(desc)
+    local own = util.own(group)
     local own_fg = not own.link and own.fg or nil
     local own_bg = not own.link and own.bg or nil
     local function cell(raw, ownv)
@@ -55,7 +67,7 @@ local function apply(s, lnum, fg_raw, bg_raw)
     if not (fg_set or bg_set) then
         return -- nothing deliberate; leave the group (and any link) untouched
     end
-    overrides.set(desc.group, fg, bg)
+    overrides.set(group, fg, bg)
 end
 
 --- Common context for a change on the current line, or nil if it should be
@@ -90,6 +102,10 @@ local function live(buf)
     if not s or s.adjusting then
         return
     end
+    if s.suppress then
+        s.suppress = false
+        return
+    end
     local row = lnum - 1
     local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
     local delta = #line - LINE_LEN
@@ -119,6 +135,10 @@ end
 local function settle(buf)
     local s, win, lnum, field = ctx(buf)
     if not s then
+        return
+    end
+    if s.suppress then
+        s.suppress = false
         return
     end
     -- Guard against stray rows (e.g. a multiline paste): keep the fixed count.
@@ -178,9 +198,52 @@ local function bump(buf, delta)
     pcall(vim.fn.winrestview, view)
 end
 
+--- Toggle the row under the cursor between editing its own group and editing the
+--- group it links to (only meaningful on a linked row). When switched to the
+--- link target, the fg/bg fields are populated with that group's own values so
+--- edits land on it directly; switched back, the fields go blank again.
+local function toggle_link(buf)
+    local s = ui.get_session(buf)
+    if not s or not s.editable or not s.rows then
+        return
+    end
+    local win = vim.api.nvim_get_current_win()
+    if vim.api.nvim_win_get_buf(win) ~= buf then
+        return
+    end
+    local lnum = vim.api.nvim_win_get_cursor(win)[1]
+    local desc = s.rows[lnum]
+    if not desc or not desc.link or desc.link == "" then
+        return -- nothing to toggle on this row
+    end
+    desc.editing_target = not desc.editing_target
+
+    -- Repopulate the row's fields for the newly active group.
+    local fg, bg = "", ""
+    if desc.editing_target then
+        local own = util.own(desc.link)
+        if not own.link then
+            fg = util.hex(own.fg) or ""
+            bg = util.hex(own.bg) or ""
+        end
+    end
+    local newline = ui.padr(fg, W) .. ui.padr(bg, W)
+    local cur = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
+    if newline ~= cur then
+        s.suppress = true -- the write below shouldn't be treated as an edit
+        pcall(vim.api.nvim_buf_set_lines, buf, lnum - 1, lnum, false, { newline })
+    end
+    ui.rerender(buf)
+    pcall(vim.api.nvim_win_set_cursor, win, { lnum, 0 })
+end
+
 --- Wire editing autocmds onto an editable tweaker buffer.
 function M.attach(buf)
     local grp = vim.api.nvim_create_augroup("TweakerEditor_" .. buf, { clear = true })
+
+    vim.keymap.set("n", "<C-t>", function()
+        toggle_link(buf)
+    end, { buffer = buf, nowait = true, silent = true, desc = "Tweaker: toggle editing the linked-to group" })
 
     vim.keymap.set("n", "<M-Up>", function()
         bump(buf, 1)

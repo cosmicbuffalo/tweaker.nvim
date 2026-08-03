@@ -40,6 +40,10 @@ local function ensure_hl()
         TweakerPriority = { link = "Number" },
         TweakerEmpty = { link = "Comment" },
     }
+    -- Struck-through "→ target" when an edit stages an unlink. Grayed like a
+    -- comment, so it reads as "this link is going away".
+    local ok_c, comment = pcall(vim.api.nvim_get_hl, 0, { name = "Comment", link = false })
+    defs.TweakerStrike = { fg = (ok_c and comment.fg) or "#808080", strikethrough = true }
     for name, val in pairs(defs) do
         val.default = true
         vim.api.nvim_set_hl(0, name, val)
@@ -60,6 +64,18 @@ local function swatch_hl(color)
     return name
 end
 
+--- Highlight for a group *name* label in the table. Active side: drawn in the
+--- group's real (resolved) color so you can see what it looks like. Inactive
+--- side: gray. Used to show which side of a `group → target` link is being edited.
+local function name_hl(group, active)
+    if not active then
+        return "TweakerSource"
+    end
+    local r = util.resolve(group)
+    local sw = r.fg and swatch_hl(util.hex(r.fg))
+    return sw or (group ~= "" and group) or "TweakerSource"
+end
+
 local function padr(s, w)
     return s .. string.rep(" ", math.max(0, w - #s))
 end
@@ -78,6 +94,7 @@ M.trim = trim
 ---@return table layout
 local function build(items)
     local rows = {}
+    local has_link = false
     local sw, gw, pw = #"SOURCE", #"GROUP", #"PRIORITY"
     for _, it in ipairs(items) do
         local own = it.hl or {}
@@ -89,6 +106,7 @@ local function build(items)
         if not link and vim.tbl_isempty(own) and it.link and it.link ~= "" and it.link ~= it.group then
             link = it.link
         end
+        has_link = has_link or (link ~= nil and link ~= "")
         local r = {
             source = it.source or "",
             group = it.group or "",
@@ -126,6 +144,7 @@ local function build(items)
         last = #rows + 1,
         width = total_w,
         has_data = #rows > 0,
+        has_link = has_link,
     }
 end
 
@@ -188,18 +207,30 @@ local function render_line(buf, lnum, desc, w)
     local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
     local fg_end, bg_start, bg_end = field_bounds(line, s, lnum)
 
-    -- SOURCE + GROUP prefix (before the fg field). Linked groups show "group → target".
-    local group_hl = desc.group ~= "" and desc.group or "TweakerSource"
+    -- SOURCE + GROUP prefix (before the fg field). Linked groups show
+    -- "group → target"; the active side (the origin, or the link target when
+    -- toggled with <C-t>) is drawn in its real color and the inactive side gray.
+    -- A staged unlink (a deliberate value typed while editing the origin) strikes
+    -- through "→ target".
+    local origin_active = not desc.editing_target
     local vt = {
         { padr(desc.source, w.sw), "TweakerSource" },
         { string.rep(" ", GAP) },
-        { desc.group, group_hl },
+        { desc.group, name_hl(desc.group, origin_active) },
     }
     local used = vim.fn.strdisplaywidth(desc.group)
     if desc.link and desc.link ~= "" then
-        local ann = " → " .. desc.link
-        vt[#vt + 1] = { ann, "TweakerSource" }
-        used = used + vim.fn.strdisplaywidth(ann)
+        local pending = false
+        if origin_active then
+            local fgv = util.parse_color(trim(line:sub(FG_S + 1, fg_end)))
+            local bgv = util.parse_color(trim(line:sub(bg_start + 1, bg_end)))
+            pending = fgv ~= nil or bgv ~= nil
+        end
+        local arrow_hl = pending and "TweakerStrike" or "TweakerSource"
+        local target_hl = pending and "TweakerStrike" or name_hl(desc.link, not origin_active)
+        vt[#vt + 1] = { " → ", arrow_hl }
+        vt[#vt + 1] = { desc.link, target_hl }
+        used = used + vim.fn.strdisplaywidth(" → " .. desc.link)
     end
     if used < w.gw then
         vt[#vt + 1] = { string.rep(" ", w.gw - used) }
@@ -498,6 +529,11 @@ function M.open(title, items, opts)
         title = " " .. title .. " ",
         noautocmd = true,
     })
+    -- Only hint at the link toggle when there's actually a linked row to toggle.
+    if layout.has_link then
+        cfg.footer = " <C-t> edit linked group "
+        cfg.footer_pos = "right"
+    end
 
     draw_source(opts.source, placement)
 
@@ -515,7 +551,8 @@ function M.open(title, items, opts)
     vim.wo[win].wrap = false
     vim.wo[win].cursorline = false
     -- Route the float's colors through the explicit Tweaker groups (not Normal).
-    vim.wo[win].winhighlight = "NormalFloat:TweakerNormal,FloatBorder:TweakerBorder,FloatTitle:TweakerBorder"
+    vim.wo[win].winhighlight =
+        "NormalFloat:TweakerNormal,FloatBorder:TweakerBorder,FloatTitle:TweakerBorder,FloatFooter:TweakerBorder"
 
     -- Overlay the junction glyph onto the window border where the connector meets
     -- it (edge cells can't be set via the border option, so we cover the cell).

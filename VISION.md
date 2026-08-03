@@ -110,9 +110,18 @@ editing a colorscheme file and reloading to see the effect.
   either an explicit link (e.g. `@variable.lua` → `@variable`) or a treesitter
   capture resolved through the `@`-hierarchy (e.g. `@string.lua` → `String`) — is
   shown as `group → target` with **blank** FG/BG cells (its colors belong to the
-  target, not itself). Typing a color into one of those blank cells **unlinks**
-  the group and gives it that color directly, so the link can be broken right from
-  the table.
+  target, not itself). There are two ways to change it:
+  - **Unlink it:** typing a color into a blank cell gives the group that color
+    directly. While a value is staged, the `→ target` annotation is shown
+    **struck through** to signal the link will be broken on save; clearing the
+    value restores the link.
+  - **Retarget the editor:** a keymap (`<C-t>`, hinted at the bottom of the window,
+    and only when a linked row exists) toggles the row between editing the group
+    and editing the group it links to. The active side is drawn in its real color
+    and the inactive side gray, the fields populate with the active group's values,
+    and edits apply directly to whichever side is active — so you can tweak the
+    shared target itself without unlinking. It only toggles the row under the
+    cursor.
 - **Empty cells.** If a group lacks a value (e.g. no background color), the cell
   renders a `-` as **virtual text** — but the cell still has a real, landable
   starting position. The moment the user edits that cell, the `-` placeholder
