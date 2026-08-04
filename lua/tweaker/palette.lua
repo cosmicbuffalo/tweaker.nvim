@@ -4,29 +4,32 @@
 --- order palette variables (red_1, red_2, light_blue_1, ...).
 local M = {}
 
--- Chromatic hue anchors: { name, representative "#hex" }. The name is chosen by
--- the nearest anchor *hue* in OKLab; lightness then picks the dark_/light_
--- variant and neutrals (grays) are split off by low chroma. Anchor hexes are
--- picked to sit at perceptually central hues/lightnesses for their name (sRGB
--- primaries like #0000ff are poor anchors: pure blue reads as violet in OKLab).
--- Users can add/override anchors via setup() (e.g. { teal = "#008080" }).
+-- Chromatic families: { name, hue (OKLab degrees), representative lightness }.
+-- A color's name is chosen by the nearest family *hue*; lightness then picks the
+-- dark_/light_ variant, and neutrals (grays) are split off first by low chroma.
+-- Hues/lightnesses are calibrated against many CSS/named reference colors (not
+-- sRGB primaries, whose OKLab hues are skewed — e.g. #0000ff reads as violet) so
+-- the boundaries match perception: e.g. the red/orange split sits near 38° so
+-- coral/sienna/chocolate read as orange, not red. Users can add/override families
+-- via setup() with { name = "#hex" } (its hue/lightness are measured from the hex).
 local DEFAULT = {
-    { "red", "#ff0000" },
-    { "orange", "#ffa500" },
-    { "yellow", "#ffd000" },
-    { "green", "#22a022" },
-    { "cyan", "#14b3b3" },
-    { "blue", "#1e90ff" },
-    { "purple", "#8a2be2" },
-    { "pink", "#ff44aa" },
+    { "red", 27, 0.55 },
+    { "orange", 50, 0.72 },
+    { "yellow", 100, 0.90 },
+    { "green", 142, 0.55 },
+    { "cyan", 195, 0.68 },
+    { "blue", 253, 0.55 },
+    { "purple", 310, 0.53 },
+    { "pink", 350, 0.70 },
 }
 
 -- Neutral (gray) names from darkest to lightest, with the upper OKLab-lightness
 -- bound of each. A color counts as neutral when its chroma is below
--- NEUTRAL_CHROMA; then its lightness picks the name.
+-- NEUTRAL_CHROMA; then its lightness picks the name. Kept low so visibly tinted
+-- colors are named by their hue rather than lumped into gray.
 local NEUTRALS = { "black", "dark_gray", "gray", "light_gray", "white" }
 local NEUTRAL_L = { black = 0.15, dark_gray = 0.40, gray = 0.65, light_gray = 0.90, white = 1.01 }
-local NEUTRAL_CHROMA = 0.045
+local NEUTRAL_CHROMA = 0.025
 
 -- How far a color's lightness must differ from its anchor's to earn a
 -- dark_/light_ prefix (OKLab L units).
@@ -90,23 +93,23 @@ local anchors = nil -- { { name, hue, L }, ... } sorted by hue
 local anchor_by_name = nil -- { [name] = { hue, L } }
 local family_order = nil -- { [family] = index } chromatic families in hue order
 
---- Configure the anchor list. `custom` is a { name = "#hex" } map merged over the
---- built-in anchors.
+--- Configure the family list. `custom` is a { name = "#hex" } map merged over the
+--- built-in families (each custom entry's hue/lightness is measured from its hex).
 function M.setup(custom)
     local map = {}
-    for _, c in ipairs(DEFAULT) do
-        map[c[1]] = c[2]
+    for _, d in ipairs(DEFAULT) do
+        map[d[1]] = { hue = d[2], L = d[3] }
     end
     for name, hex in pairs(custom or {}) do
-        map[name] = hex
+        local L, _, h = oklch(hex)
+        map[name] = { hue = h, L = L }
     end
 
     anchors, anchor_by_name = {}, {}
-    for name, hex in pairs(map) do
-        local L, _, h = oklch(hex)
-        local a = { name = name, hue = h, L = L }
-        anchors[#anchors + 1] = a
-        anchor_by_name[name] = a
+    for name, a in pairs(map) do
+        local anc = { name = name, hue = a.hue, L = a.L }
+        anchors[#anchors + 1] = anc
+        anchor_by_name[name] = anc
     end
     table.sort(anchors, function(a, b)
         return a.hue < b.hue
@@ -156,8 +159,8 @@ function M.nearest(hex)
     end
 
     -- Brown is dark orange (kept off the red hue so dark reds stay dark_red).
-    if fam.name == "orange" and L < 0.50 then
-        return L < 0.30 and "dark_brown" or "brown"
+    if fam.name == "orange" and L < 0.55 then
+        return L < 0.32 and "dark_brown" or "brown"
     end
 
     if L < fam.L - VAR_MARGIN then
