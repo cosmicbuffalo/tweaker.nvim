@@ -275,17 +275,28 @@ function M.maybe_attach(buf)
     })
 end
 
---- Register the FileType/BufRead hook. Called from setup().
+--- Register the autocmds. Called from setup().
 function M.setup(enabled)
     M.enabled = enabled ~= false
     if not M.enabled then
         return
     end
+    local grp = vim.api.nvim_create_augroup("TweakerPreviewDetect", { clear = true })
     vim.api.nvim_create_autocmd({ "BufReadPost", "BufWinEnter" }, {
-        group = vim.api.nvim_create_augroup("TweakerPreviewDetect", { clear = true }),
+        group = grp,
         pattern = "*.lua",
         callback = function(ev)
             M.maybe_attach(ev.buf)
+        end,
+    })
+    -- Loading/re-sourcing a colorscheme runs `highlight clear`, which wipes our
+    -- ephemeral swatch groups (leaving the swatches gray). Drop the now-dangling
+    -- cache and re-decorate every baked buffer so the swatches are rebuilt.
+    vim.api.nvim_create_autocmd("ColorScheme", {
+        group = grp,
+        callback = function()
+            hl_cache, hl_n = {}, 0
+            M.refresh_all()
         end,
     })
 end

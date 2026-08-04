@@ -88,4 +88,32 @@ describe("preview", function()
         assert.is_false(has_virt(2, "██"))
         assert.is_true(has_virt(8, "undefined link target"))
     end)
+
+    it("rebuilds swatch colors after a colorscheme change wipes them", function()
+        preview.setup(true) -- registers the ColorScheme handler
+
+        local function swatch_group(row)
+            for _, m in ipairs(vim.api.nvim_buf_get_extmarks(buf, ns, { row, 0 }, { row, -1 }, { details = true })) do
+                local d = m[4]
+                if d.virt_text then
+                    for _, chunk in ipairs(d.virt_text) do
+                        if chunk[1]:find("██", 1, true) and chunk[2] then
+                            return chunk[2]
+                        end
+                    end
+                end
+            end
+        end
+
+        local g = swatch_group(2)
+        assert.is_not_nil(g)
+        assert.equals(BLUE, vim.api.nvim_get_hl(0, { name = g }).fg)
+
+        vim.api.nvim_set_hl(0, g, {}) -- simulate `highlight clear` wiping the group
+        assert.is_nil(vim.api.nvim_get_hl(0, { name = g }).fg)
+
+        vim.api.nvim_exec_autocmds("ColorScheme", {})
+        local g2 = swatch_group(2)
+        assert.equals(BLUE, vim.api.nvim_get_hl(0, { name = g2 }).fg)
+    end)
 end)
