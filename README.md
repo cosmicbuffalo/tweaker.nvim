@@ -16,6 +16,16 @@ your Tweaker overrides into a new color scheme file!
 > (`:TweakerBake`), and a live preview of baked files. Editable priority is the
 > main planned addition (see the roadmap).
 
+## Demo
+
+![Editing highlight groups live with tweaker.nvim: opening :Tweaker on the code under the cursor, changing foreground and background colors and watching the buffer recolor as you type, then baking the result into a standalone colorscheme whose file renders as a live legend](demo/tweaker-demo.gif)
+
+Point `:Tweaker` at the code under your cursor, change the colors and watch the
+buffer recolor as you type, then `:TweakerBake` the result into a real
+colorscheme (whose file renders as a live legend). Recorded in the inkline
+"original" colorscheme by [`demo/record.sh`](demo/record.sh), which never touches
+your config or data. ([Download the MP4.](demo/tweaker-demo.mp4))
+
 ## Requirements
 
 - Neovim >= 0.10 (uses `vim.inspect_pos`, `vim.uv`, and the highlight-priority

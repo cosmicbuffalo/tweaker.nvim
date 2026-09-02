@@ -3,3 +3,6 @@
 
 # generated help tags
 doc/tags
+
+# demo recording deps (fetched by demo/record.sh)
+demo/.deps/
