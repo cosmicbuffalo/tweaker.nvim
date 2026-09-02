@@ -237,6 +237,13 @@ function M.write(name, force)
     f:write(M.generate(name))
     f:close()
 
+    -- Neovim caches the runtime-file search results per 'runtimepath'. When we
+    -- write the very first colorscheme into a colors/ dir that didn't exist (or
+    -- was empty) at startup, that cache is stale and `:colorscheme name` fails
+    -- with E185 even though the file is on rtp. Re-setting 'runtimepath' to
+    -- itself invalidates the cache so the freshly written file is found.
+    vim.o.runtimepath = vim.o.runtimepath
+
     -- Switch to (or re-source, when re-baking in place) the freshly baked scheme.
     local ok, err = pcall(vim.cmd.colorscheme, name)
     if ok then
