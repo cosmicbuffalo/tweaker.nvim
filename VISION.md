@@ -2,14 +2,14 @@
 
 > This is a living document. It captures, in plain language, the full shared
 > vision for what `tweaker.nvim` is and how it should behave. It is updated
-> whenever new requirements or expectations are described. Implementation status
-> lives in the README roadmap; this file is about *intent*, not progress.
+> whenever new requirements or expectations are described. This file is about
+> *intent*, not progress.
 
 ## The one-liner
 
 `tweaker.nvim` lets you inspect, live-edit, and persist Neovim highlight-group
-colors and priorities from a floating window — then bake your accumulated tweaks
-into a real, shareable colorscheme.
+colors from a floating window (with each source's draw priority shown alongside)
+— then bake your accumulated tweaks into a real, shareable colorscheme.
 
 ## Who it's for
 
@@ -96,8 +96,8 @@ editing a colorscheme file and reloading to see the effect.
   - `GROUP` — non-editable (rendered in its own highlight, as a live swatch)
   - `FG` (foreground color) — **editable**
   - `BG` (background color) — **editable**
-  - `PRIORITY` — **editable**
-- **Editable vs. non-editable.** Only `PRIORITY`, `FG`, and `BG` are editable.
+  - `PRIORITY` — non-editable (a property of the drawing source, not the group)
+- **Editable vs. non-editable.** Only `FG` and `BG` are editable.
   Everything else — labels, source, group name, column gaps — is rendered as
   **virtual text** (the same technique the oil.nvim virtual-columns fork uses).
   Because non-editable content isn't real buffer text, the cursor simply cannot

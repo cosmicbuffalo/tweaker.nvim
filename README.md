@@ -10,12 +10,6 @@ whatever you were doing.
 When you're happy with your color scheme and ready to bake it, run `:TweakerBake` to turn
 your Tweaker overrides into a new color scheme file!
 
-> [!NOTE]
-> What works today: live editing (`:Tweaker`), per-colorscheme persistence,
-> editing/relinking linked groups, baking to a standalone colorscheme
-> (`:TweakerBake`), and a live preview of baked files. Editable priority is the
-> main planned addition (see the roadmap).
-
 ## Demo
 
 ![Editing highlight groups live with tweaker.nvim: opening :Tweaker on the code under the cursor, changing foreground and background colors and watching the buffer recolor as you type, then baking the result into a standalone colorscheme whose file renders as a live legend](demo/tweaker-demo.gif)
@@ -44,19 +38,7 @@ your config or data. ([Download the MP4.](demo/tweaker-demo.mp4))
 }
 ```
 
-### Local development
-
-```lua
-{
-    dir = vim.fn.expand("~/tweaker.nvim"),
-    lazy = false,
-    opts = {},
-}
-```
-
 ## Configuration
-
-`opts` is passed to `require("tweaker").setup()`. Defaults:
 
 ```lua
 {
@@ -83,9 +65,8 @@ your config or data. ([Download the MP4.](demo/tweaker-demo.mp4))
 
 ### Appearance
 
-The window's colors come from dedicated, overridable highlight groups (they are
-intentionally **not** linked to `Normal`). Set them yourself to restyle the
-window — for example:
+The window's colors come from dedicated, overridable highlight groups. Set them
+yourself to restyle the window — for example:
 
 ```lua
 vim.api.nvim_set_hl(0, "TweakerBorder", { fg = "#e6c200", bg = "#101010" })
@@ -120,8 +101,9 @@ the overrides file). For editing issues, enable a debug log with
 `:checkhealth tweaker`.
 
 Table columns: `SOURCE · GROUP · FG · BG · PRIORITY`. **FG and BG are editable**
-(PRIORITY is read-only for now). Navigate between the FG/BG cells with normal Vim
-motions (or `<Tab>`/`<S-Tab>`); edit a cell with normal editing. Accepted values:
+(PRIORITY is read-only — it's a property of the drawing source, not the group).
+Navigate between the FG/BG cells with normal Vim motions (or `<Tab>`/`<S-Tab>`);
+edit a cell with normal editing. Accepted values:
 a hex color `#rrggbb` or `NONE` (clears the attribute). Changes apply to the
 running session live via `nvim_set_hl` as you edit; an empty cell shows `-` until
 you type into it. Color cells keep a fixed width while you edit, so the other
@@ -211,36 +193,14 @@ option.
 
 ## Baked-file preview
 
-Open a colorscheme that tweaker baked and it renders as a **live legend**: each
-group name in a `set(0, "Group", …)` call — and each `link = "Target"` — is drawn
-in that group's own appearance (fg/bg/bold/italic, with links resolved to their
-target's look), and a **swatch** is shown after every hex color and every
-`p.<var>` palette reference — a solid block, `Xx` in the color as foreground, and
-`Xx` with the color as background (white/black text chosen for contrast). It's
-parsed from the file's own `p = {…}` and `set()` calls, so the
-preview is accurate even when a different colorscheme is active, and it's
-read-only decoration (it never changes the buffer or your highlights). A
-`link = "Target"` whose target the colorscheme never defines is flagged as an
-undefined link target. Only files carrying tweaker's generated header are
-decorated; toggle the swatches with `:TweakerToggleSwatches`, or disable the
-whole preview with `preview = false`.
+![A tweaker-baked colorscheme file rendered as a live legend: palette variables shown with color swatches, each entry annotated with the highlight groups that use it](demo/baked-preview.png)
 
-## Roadmap
-
-- [x] `:Tweaker [group…]` — editable table with live fg/bg preview
-- [x] Persist overrides across restarts (reapply on `ColorScheme`/startup)
-- [x] Toggle overrides on/off; save/load
-- [x] Export overrides to a standalone colorscheme (named palette variables)
-- [x] Preview baked colorscheme files as a live legend
-- [ ] Editable priority
-
-## How it works
-
-Highlight sources are gathered with `vim.inspect_pos`, which reports treesitter
-captures, LSP semantic tokens, `:syntax` groups, and extmarks — each already
-carrying its highlight group and draw priority. Priorities follow Neovim's
-ladder (`vim.hl.priorities`, or `vim.highlight.priorities` on 0.10): syntax `50`,
-treesitter `100`, semantic tokens `125`, up to user extmarks `200`.
+Open a colorscheme that tweaker baked and it renders as a **live legend**: every
+group name is drawn in its own appearance, and a **swatch** follows every hex
+color and every `p.<var>` palette reference. It's read-only decoration parsed
+from the file itself, so it stays accurate even under a different colorscheme.
+Toggle the swatches with `:TweakerToggleSwatches`, or disable the preview with
+`preview = false`.
 
 ## Development
 
