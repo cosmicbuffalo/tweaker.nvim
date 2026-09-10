@@ -14,10 +14,12 @@ local PRI = (vim.hl or vim.highlight).priorities
 ---@field group string       the highlight group name
 ---@field link string|nil    the group it links to, if any
 ---@field priority integer    effective draw priority (higher wins)
+---@field order integer       draw order at equal priority (higher sits on top)
 ---@field hl table           resolved attributes (fg/bg/bold/...)
 
 --- Collect every highlight contribution at (row, col) [0-indexed] in `bufnr`,
---- sorted by priority descending so the winning group is first.
+--- ordered so the group that actually paints the cell is first (and the cursor,
+--- which starts on the first row, lands on it).
 ---@param bufnr integer|nil
 ---@param row integer  0-indexed
 ---@param col integer  0-indexed
@@ -33,11 +35,18 @@ function M.collect(bufnr, row, col)
     })
 
     local items = {}
+    -- `order` records Neovim's application (draw) order: contributions drawn
+    -- later sit on top, so at equal priority the higher `order` wins. We add
+    -- sources in draw order (syntax < treesitter < semantic < extmark) and, in
+    -- each, in the order vim.inspect_pos reports them (later capture = on top —
+    -- e.g. @comment.documentation over @comment).
+    local order = 0
 
     local function add(source, group, priority, link)
         if not group or group == "" then
             return
         end
+        order = order + 1
         table.insert(items, {
             source = source,
             group = group,
@@ -45,8 +54,13 @@ function M.collect(bufnr, row, col)
             -- Some sources report priority as a string (e.g. treesitter
             -- `(#set! priority N)` directives), so coerce to a number.
             priority = tonumber(priority) or 0,
+            order = order,
             hl = util.own(group), -- own definition (may be a link)
         })
+    end
+
+    for _, sy in ipairs(info.syntax or {}) do
+        add("syntax", sy.hl_group, PRI.syntax, sy.hl_group_link)
     end
 
     for _, ts in ipairs(info.treesitter or {}) do
@@ -61,31 +75,69 @@ function M.collect(bufnr, row, col)
         add("semantic", o.hl_group, o.priority or PRI.semantic_tokens, o.hl_group_link)
     end
 
-    for _, sy in ipairs(info.syntax or {}) do
-        add("syntax", sy.hl_group, PRI.syntax, sy.hl_group_link)
-    end
-
     for _, ex in ipairs(info.extmarks or {}) do
         local o = ex.opts or {}
         add("extmark", o.hl_group, o.priority or PRI.user, o.hl_group_link)
     end
 
-    table.sort(items, function(a, b)
+    -- Dedupe: the same highlight group can be reported by more than one source;
+    -- keep its topmost occurrence (highest priority, then latest draw order).
+    local best = {}
+    for _, it in ipairs(items) do
+        local prev = best[it.group]
+        if
+            not prev
+            or it.priority > prev.priority
+            or (it.priority == prev.priority and it.order > prev.order)
+        then
+            best[it.group] = it
+        end
+    end
+    local unique = {}
+    for _, it in pairs(best) do
+        unique[#unique + 1] = it
+    end
+
+    -- Find the group that actually paints the cell. Neovim layers the
+    -- contributions in draw order and merges their attributes, so the effective
+    -- foreground comes from the topmost (highest priority, then latest-drawn)
+    -- group that defines an fg — even when a color-less group (e.g. @spell,
+    -- @nospell) sits above it. That fg provider is "the one that wins" the color
+    -- the user sees; fall back to the bg provider, then the topmost overall.
+    table.sort(unique, function(a, b)
+        if a.priority ~= b.priority then
+            return a.priority < b.priority
+        end
+        return a.order < b.order
+    end)
+    local winner
+    for _, it in ipairs(unique) do
+        if util.resolve(it.group).fg ~= nil then
+            winner = it
+        end
+    end
+    if not winner then
+        for _, it in ipairs(unique) do
+            if util.resolve(it.group).bg ~= nil then
+                winner = it
+            end
+        end
+    end
+
+    -- Display order: the winning group first (obvious position + cursor start),
+    -- then the rest as a top-down layer stack.
+    table.sort(unique, function(a, b)
+        if a == winner then
+            return b ~= winner
+        end
+        if b == winner then
+            return false
+        end
         if a.priority ~= b.priority then
             return a.priority > b.priority
         end
-        return a.source < b.source
+        return a.order > b.order
     end)
-
-    -- Dedupe: the same highlight group can be reported by multiple sources; keep
-    -- only its highest-priority occurrence (items are already sorted desc).
-    local seen, unique = {}, {}
-    for _, it in ipairs(items) do
-        if not seen[it.group] then
-            seen[it.group] = true
-            unique[#unique + 1] = it
-        end
-    end
 
     return unique
 end

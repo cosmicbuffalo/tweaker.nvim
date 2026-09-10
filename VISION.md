@@ -22,9 +22,10 @@ editing a colorscheme file and reloading to see the effect.
 
 - **Highlight groups under the cursor.** At any cursor position, multiple
   highlight sources can contribute: treesitter captures, LSP semantic tokens,
-  `:syntax` groups, and extmarks. Each has a **priority**; the highest-priority
-  one is what you actually see. The plugin surfaces all of them so you understand
-  *why* text looks the way it does.
+  `:syntax` groups, and extmarks. They are layered by **priority** (and, at equal
+  priority, draw order), and their attributes merge — so the color you actually
+  see comes from the topmost contribution that defines it. The plugin surfaces
+  all of them so you understand *why* text looks the way it does.
 - **Priority ladder.** Neovim's `vim.hl.priorities`: syntax `50`, treesitter
   `100`, semantic tokens `125`, diagnostics `150`, user extmarks `200`.
 
@@ -90,8 +91,9 @@ editing a colorscheme file and reloading to see the effect.
   - `TweakerBorder` — border/title: black bg, yellow fg
   - `TweakerConnector` — leader line: black bg, yellow fg (matches the border)
   - `TweakerCursor` — source cursor location: white bg, black fg
-- **Table layout.** Selected highlight groups are shown in a table, **sorted by
-  priority**. Columns, left to right:
+- **Table layout.** Selected highlight groups are shown in a table, **the group
+  that actually paints the cell first** (so the cursor starts on it), then the
+  rest as a top-down layer stack. Columns, left to right:
   - `SOURCE` — non-editable (treesitter / semantic / syntax / extmark)
   - `GROUP` — non-editable (rendered in its own highlight, as a live swatch)
   - `FG` (foreground color) — **editable**
