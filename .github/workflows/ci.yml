@@ -23,7 +23,7 @@ jobs:
       matrix:
         nvim-version: ["stable", "nightly"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Neovim
         uses: rhysd/action-setup-vim@v1
@@ -39,10 +39,10 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check formatting with StyLua
-        uses: JohnnyMorganz/stylua-action@v4
+        uses: JohnnyMorganz/stylua-action@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
@@ -51,11 +51,14 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Install Selene
-        uses: NTBBloodbath/selene-action@v1.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          version: latest
-          args: --display-style=quiet lua/ plugin/ tests/
+      # selene-action is unmaintained (Node 20), so install the binary directly.
+      - name: Lint with Selene
+        run: |
+          SELENE_VERSION=0.31.0
+          curl -fsSL -o /tmp/selene.zip \
+            "https://github.com/Kampfkarren/selene/releases/download/${SELENE_VERSION}/selene-${SELENE_VERSION}-linux.zip"
+          unzip -o -q /tmp/selene.zip -d /tmp/selene
+          chmod +x /tmp/selene/selene
+          /tmp/selene/selene --display-style=quiet lua/ plugin/ tests/
