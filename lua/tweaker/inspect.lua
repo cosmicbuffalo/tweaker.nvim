@@ -85,11 +85,7 @@ function M.collect(bufnr, row, col)
     local best = {}
     for _, it in ipairs(items) do
         local prev = best[it.group]
-        if
-            not prev
-            or it.priority > prev.priority
-            or (it.priority == prev.priority and it.order > prev.order)
-        then
+        if not prev or it.priority > prev.priority or (it.priority == prev.priority and it.order > prev.order) then
             best[it.group] = it
         end
     end
